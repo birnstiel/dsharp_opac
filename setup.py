@@ -1,7 +1,7 @@
 """
 Setup file for package `lp_opac`.
 """
-from distutils import setup
+from setuptools import setup
 import os
 
 PACKAGENAME = 'lp_opac'
@@ -16,7 +16,7 @@ setup(name=PACKAGENAME,
       author='LP',
       author_email='til.birnstiel@lmu.de',
       license='GPLv3',
-      packages=[PACKAGENAME],
+      packages=[PACKAGENAME + '.py'],
       include_package_data=True,
       install_requires=['scipy', 'numpy', 'matplotlib'],
       zip_safe=False
