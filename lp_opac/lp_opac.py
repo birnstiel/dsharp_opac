@@ -8,37 +8,72 @@ This module contains opacity scripts and all the helper and testing routines.
 import numpy as np
 import os
 import sys
+import warnings
 import pkg_resources
 
-from .bhmie import bhmie
+try:
+    from .bhmie_draine import bhmie
+except ImportError:
+    warnings.warn('could not import compiled mie code - mie calculation will be slow')
+    from .bhmie import bhmie as bhmie_py
 
-pi = np.pi
+    def bhmie(x, nk, nangles):
+        """
+        wrapper for the python version to be callable just like the fortran version.
+
+        Arguments:
+        ----------
+
+        x : float
+            size parameter 2 pi a / lambda
+
+        nk : tuple
+            n and k as tuple, not as complex value. ref. index = n + i * k
+
+        nangles : int
+            number of angles between 0 and 180 degree for which to return S1 & S2
+
+        Output:
+        -------
+        S1, S2, Qext, Qabs, Qsca, Qback, gsca
+
+        S1, S2 : arrays
+            the matrix elements as function of angle
+
+        Qext, Qabs, Qsca, Qback : float
+            the extinction, absorption, scattering, backscattering coefficients
+
+        gsca : float
+            Henyey-Greenstein asymmetry factor
+        """
+        theta = np.linspace(0., 180., nangles + 1)
+        return bhmie_py(x, complex(nk[0], nk[1]), theta)
 
 try:
     import pymiecoated
 
-    def bhmie_pymiecoated(x, nk, angles):
+    def bhmie_pymiecoated(x, nk, n_angles):
         """
         Wrapper to the Mie code of `pymiecoated`
 
         x : float
             size parameter x = 2 pi a / lambda
 
-        nk : complex
-            complex refractive index n + i k
+        nk : 2 element tuple
+            complex refractive index n + i k, first element n, second k
 
-        angles : array
-            array of angles in degree for which to return S1 & S2
+        nangles : int
+            number of angles between 0 and 180 degree for which to return S1 & S2
 
         Output:
         -------
-        S1, S2, Qext, Qsca, Qback, gsca
+        S1, S2, Qext, Qabs, Qsca, Qback, gsca
 
         S1, S2 : arrays
             the matrix elements as function of angle
 
-        Qext, Qsca, Qback : float
-            the extinction, scattering backscatterin coefficients
+        Qext, Qabs, Qsca, Qback : float
+            the extinction, absorption, scattering, backscattering coefficients
 
         gsca : float
             Henyey-Greenstein asymmetry factor
@@ -48,17 +83,20 @@ try:
         #
         opac = pymiecoated.Mie(x=x, m=nk)
         Qext = opac.qext()
+        Qabs = opac.qabs()
         Qsca = opac.qsca()
         Qback = opac.qratio()
         gsca = opac.asy()
 
-        S1 = np.zeros(len(angles))
-        S2 = np.zeros(len(angles))
+        S1 = np.zeros(len(n_angles))
+        S2 = np.zeros(len(n_angles))
+
+        angles = np.linspace(0., 180., n_angles + 1)
 
         for i, angle in enumerate(angles):
             S1[i], S2[i] = opac.S12(np.cos(angle / 180 * np.pi))
 
-        return S1, S2, Qext, Qsca, Qback, gsca
+        return S1, S2, Qext, Qabs, Qsca, Qback, gsca
 except ImportError:
     pass
 
@@ -111,6 +149,7 @@ class diel_const(object):
     material_str = None
     _lmin = None
     _lmax = None
+    extrapol = False
 
     def __init__(self):
         """
@@ -137,8 +176,50 @@ class diel_const(object):
         :    imaginary part of optical property
         """
         if np.array(l, ndmin=1).min() < self._lmin or np.array(l, ndmin=1).max() > self._lmax:
-            raise NameError('{}: wavelength {:g} outside data-range [{:g},{g}]'.format(type(self).__name__, l, self._lmin, self._lmax))
+            raise NameError('{}: wavelength {:g} outside data-range [{:g},{:g}]'.format(type(self).__name__, l, self._lmin, self._lmax))
         return 10.**np.interp(np.log10(l), self._ll, self._ln), 10.**np.interp(np.log10(l), self._ll, self._lk)
+
+    def extrapolate_constants(self, lmin, lmax):
+        """
+        Extend the data by extrapolation to longer wavelengths. Will start
+        fitting for extrapolation at lmin and then extend the data up to lmax.
+        """
+        #
+        # extrapolate
+        #
+        self.extrapol = True
+
+        l_ext = np.logspace(np.log10(self._l[-1]), np.log10(lmax), 10)
+        from scipy.optimize import curve_fit
+
+        def f(x, a, b, c):
+            return a + b * x + c * x**2
+
+        i_min = abs(self._l - lmin).argmin()
+        #
+        # extrapolate n
+        #
+        res = curve_fit(f, np.log10(self._l[i_min:]), np.log10(self._n[i_min:]), [np.log10(self._n[-1]), 1, 0])
+        n_ext = 10.**f(np.log10(l_ext), *res[0])
+        n_new = np.append(self._n, n_ext)
+        #
+        # extrapolate k
+        #
+        res = curve_fit(f, np.log10(self._l[i_min:]), np.log10(self._k[i_min:]), [np.log10(self._k[-1]), 1, 0])
+        k_ext = 10.**f(np.log10(l_ext), *res[0])
+        k_new = np.append(self._k, k_ext)
+        l_new = np.append(self._l, l_ext) # noqa
+
+        # update attributes
+
+        self._l = l_new
+        self._n = n_new
+        self._k = k_new
+        self._ll = np.log10(self._l)
+        self._ln = np.log10(self._n)
+        self._lk = np.log10(self._k)
+        self._lmin = self._l.min()
+        self._lmax = self._l.max()
 
 
 class diel_from_lnk_file(diel_const):
@@ -261,6 +342,7 @@ class diel_vacuum(diel_const):
     """
     Returns the dielectric constants for vacuum
     """
+    extrapol = False
 
     def __init__(self):
         """
@@ -279,36 +361,43 @@ class diel_vacuum(diel_const):
 class diel_zubko_carbon(diel_const):
     """
     Returns the dielectric constants for carbon grains from Zubko et
-    al. 1996 (the BE values). The data was OCRed by Til Birnstiel, no
+    al. 1996 (the BE, ACH2 values). The data was OCRed by Til Birnstiel, no
     guarantee for correctness.
+
+    Arguments:
+    ----------
+
+    sample : str
+        which of the samples to use, implemented are: 'ACH2', 'BE'
 
     Keywords:
     ---------
 
     extrapol : bool
-    :    whether or not to extrapolate beyond ~0.19 mm
+        whether or not to extrapolate beyond ~0.19 mm
 
     lmax : float
-    :    upper limit for extrapolation range
+        upper limit for extrapolation range
     """
 
-    def __init__(self, extrapol=False, lmax=1.0):
+    def __init__(self, sample='ACH2', extrapol=False, lmax=1.0):
         """
         Overwrite the initialization of the parent class
         """
         #
         # open files, read data
         #
+        directory = os.path.join('optical_constants', 'zubko+1996')
+
         self.material_str = 'Carbonaceous Grains (Zubko et al. 1996)'
-        self.datafile = pkg_resources.resource_filename(
-            __name__, os.path.join('optical_constants', 'zubko+1996'))
+        self.datafile = directory
 
         E = np.loadtxt(pkg_resources.resource_filename(
-            __name__, os.path.join(self.datafile, 'zubko_E.txt')))[-1::-1]
+            __name__, os.path.join(self.datafile, f'zubko_E_{sample}.txt')))[-1::-1]
         n = np.loadtxt(pkg_resources.resource_filename(
-            __name__, os.path.join(self.datafile, 'zubko_n_BE.txt')))[-1::-1]
+            __name__, os.path.join(self.datafile, f'zubko_n_{sample}.txt')))[-1::-1]
         k = np.loadtxt(pkg_resources.resource_filename(
-            __name__, os.path.join(self.datafile, 'zubko_k_BE.txt')))[-1::-1]
+            __name__, os.path.join(self.datafile, f'zubko_k_{sample}.txt')))[-1::-1]
         l = 0.00012398419292004205 / E  # E = h*c/lambda in CGS # noqa
         #
         # extrapolate
@@ -356,7 +445,7 @@ class diel_warren(diel_const):
 
         http://www.atmos.washington.edu/ice_optical_constants/
 
-    on Jan 23, 2014.
+    on Jan 23, 2014 and is based on Warren & Brandt (2008).
 
     The old data was taken from the journal website, where
     the coldest temperature column was used.
@@ -440,6 +529,7 @@ class diel_luca(diel_const):
         # set the path and do some safety checks
         #
         self.material_str = ('Lucas ' + species).replace('ice', 'water ice')
+        self.extrapol = extrapol
         #
         # set the file name
         #
@@ -707,7 +797,7 @@ def get_total_opacity(a, lam, n, rho_s, diel_constants, q_abs=None, q_sca=None):
     #
     # some basic conversions
     #
-    m = 4. * pi / 3. * rho_s * a**3
+    m = 4. * np.pi / 3. * rho_s * a**3
     C = log(a[2] / a[1])
     sig = n * m * a * C
     sig = sig / sum(sig)
@@ -716,8 +806,8 @@ def get_total_opacity(a, lam, n, rho_s, diel_constants, q_abs=None, q_sca=None):
     #
     if q_abs is None or q_sca is None:
         q_abs, q_sca = get_mie_coefficients(a, lam, diel_constants)
-    kappa_abs = q_abs * np.tile(pi * a**2 / m, [len(lam), 1]).transpose()
-    kappa_sca = q_sca * np.tile(pi * a**2 / m, [len(lam), 1]).transpose()
+    kappa_abs = q_abs * np.tile(np.pi * a**2 / m, [len(lam), 1]).transpose()
+    kappa_sca = q_sca * np.tile(np.pi * a**2 / m, [len(lam), 1]).transpose()
     #
     # ... average them over the size distribution ...
     #
@@ -792,7 +882,7 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie, nang=3, r
 
     method: callable
     : a function that carries out the Mie calculation with this signature
-        S1, S2, Qext, Qsca, Qback, gsca = bhmie(x, complex(n, k), angles)
+        S1, S2, Qext, Qabs, Qsca, Qback, gsca = bhmie(x, (n, k), n_angles)
 
     nang: int
     :    Number of angles for scattering function (not supported by all methods)
@@ -817,8 +907,8 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie, nang=3, r
     q_abs = zeros([len(A), len(LAM)])
     q_sca = zeros([len(A), len(LAM)])
     gg_sca = zeros([len(A), len(LAM)])
-    s_1 = zeros([len(A), len(LAM), 2 * nang - 1], dtype=complex)
-    s_2 = zeros([len(A), len(LAM), 2 * nang - 1], dtype=complex)
+    s_1 = zeros([len(A), len(LAM), nang], dtype=complex)
+    s_2 = zeros([len(A), len(LAM), nang], dtype=complex)
     NMXX = 200000
     #
     # the wave length loop
@@ -835,7 +925,7 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie, nang=3, r
         #
         # define the size parameter
         #
-        X = 2. * pi / lam * A
+        X = 2. * np.pi / lam * A
         #
         # define the cutoff where no convergence is reached
         #
@@ -858,12 +948,12 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie, nang=3, r
         # loop through the sizes
         #
         for ia, x in enumerate(X_cut):
-            S1, S2, Qext, Qsca, Qback, gsca = bhmie_function(x, complex(n, k), np.linspace(0., 180., nang))
-            q_abs[ia, ilam] = Qext - Qsca
+            S1, S2, Qext, Qabs, Qsca, Qback, gsca = bhmie_function(x, (n, k), nang)
+            q_abs[ia, ilam] = Qabs
             q_sca[ia, ilam] = Qsca
-            gg_sca[ia, ilam] = gsca
-            s_1[ia, ilam, :] = S1
-            s_2[ia, ilam, :] = S2
+            gg_sca[ia, ilam] = gsca.real
+            s_1[ia, ilam, :] = S1[:nang]
+            s_2[ia, ilam, :] = S2[:nang]
         #
         # extrapolate for large grains
         #
@@ -877,25 +967,28 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie, nang=3, r
         return q_abs, q_sca
 
 
-def compare_nk(c1=None, c2=None, amin=1e-5, amax=1e3):
+def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False):
     """
-    Compares the dielectric functions c1 and c2 (the n and k values)
+    Compares the dielectric functions c1 and c2 (their n and k values)
     by plotting them on the range from amin to amax.
 
     Keywords:
     ---------
 
-    c1 : instance of diel_constant
-    :    first diel. function, defaults to ice without extrapolation
+    constants : list of instances of diel_constant
+        the dielectric constants to compare
 
-    c2 : instance of diel_constant
-    :    second diel. function, defaults to ice with extrapolation
-
-    amin : float
+    lmin : float
     :    lower bound of the plotting range
 
-    amax : float
+    lmax : float
     :    upper bound of the plotting range
+
+    Keywords:
+    ---------
+
+    orig_data : bool
+        if true, then just plot the original data of each object
 
     Output:
     -------
@@ -903,49 +996,33 @@ def compare_nk(c1=None, c2=None, amin=1e-5, amax=1e3):
     """
     import matplotlib.pyplot as plt
 
-    if c1 is None:
-        c1 = diel_luca('ice', extrapol=False)
-    if c2 is None:
-        c2 = diel_luca('ice', extrapol=True, lmax=amax)
-
-    na = 100
-
-    a = np.logspace(np.log10(amin), np.log10(amax), na)
-
-    nk1 = np.zeros([len(a), 2])
-    nk2 = np.zeros([len(a), 2])
-
-    for i in np.arange(na):
-        try:
-            nk1[i] = c1.nk(a[i])
-        except BaseException:
-            pass
-        try:
-            nk2[i] = c2.nk(a[i])
-        except BaseException:
-            pass
+    nlam = 100
+    lam = np.logspace(np.log10(lmin), np.log10(lmax), nlam)
 
     f, ax = plt.subplots()
-    ax.loglog(a, nk1[:, 0], label='$n_1$%s' % c1.material_str, c='C0', alpha=0.7, ls='-')
-    ax.loglog(a, nk2[:, 0], label='$n_2$%s' % c1.material_str, c='C0', alpha=0.7, ls='--')
 
-    if c1.extrapol is True:
-        ax.axvline(c1._lmin, c='C0')
-        ax.axvline(c1._lmax, c='C0')
+    for n, c in enumerate(constants):
+        nk = np.zeros([len(lam), 2])
 
-    ax.loglog(a, nk1[:, 1], label='$k_1$%s' % c1.material_str, c='C1', alpha=0.7, ls='-')
-    ax.loglog(a, nk2[:, 1], label='$k_2$%s' % c1.material_str, c='C1', alpha=0.7, ls='--')
+        if orig_data:
+            lam = c._l
+            nk = np.array([c._n, c._k]).T
+        else:
+            for i in np.arange(nlam):
+                try:
+                    nk[i] = c.nk(lam[i])
+                except BaseException:
+                    nk[i] = np.nan
 
-    if c2.extrapol is True:
-        ax.axvline(c2._lmin, c='C1')
-        ax.axvline(c2._lmax, c='C1')
+        ax.loglog(lam, nk[:, 0], label='$n_1$ - {}'.format(c.material_str), c=f'C{n}', alpha=0.7, ls='-')
+        ax.loglog(lam, nk[:, 1], label='$k_1$ - {}'.format(c.material_str), c=f'C{n}', alpha=0.7, ls='--')
 
-    ax.set_xlabel('wavelength')
+    ax.set_xlabel('wavelength [cm]')
     ax.set_ylabel('$n, k$')
     ax.legend(loc='best')
 
 
-def get_default_diel_constants():
+def get_default_diel_constants(extrapol=False):
     """
     This method calculates the mixed mie coefficients as in Ricci et al. 2010.
 
@@ -956,6 +1033,12 @@ def get_default_diel_constants():
     |:---------------:|:---------:|:-------------:|:---------:|:------:|
     | volume fraction | 0.07      |     0.21      |    0.42   | 0.30   |
     | solid densities | 3.5 g/cc  |    2.5 g/cc   |  1 g/cc   | 0 g/cc |
+
+    Keywords:
+    ---------
+
+    extrapol : bool
+        whether the optical constants do extrapolation or not
 
     Output:
     -------
@@ -971,9 +1054,9 @@ def get_default_diel_constants():
     # c3 = diel_warren(new=False)
     # c4 = diel_vacuum()
 
-    c1 = diel_luca('silicate', extrapol=True, lmax=100.0)
-    c2 = diel_luca('carbon', extrapol=True, lmax=100.0)
-    c3 = diel_luca('ice', extrapol=True, lmax=100.0)
+    c1 = diel_luca('silicate', extrapol=extrapol, lmin=1e-6, lmax=100.0)
+    c2 = diel_luca('carbon', extrapol=extrapol, lmin=1e-6, lmax=100.0)
+    c3 = diel_luca('ice', extrapol=extrapol, lmin=1e-6, lmax=100.0)
     c4 = diel_vacuum()
     constants = [c1, c2, c3, c4]
 
@@ -988,7 +1071,7 @@ def get_default_diel_constants():
     return diel_constants, rho_s
 
 
-def get_default_opacities(a, lam, bhmie_function=bhmie, return_all=False):
+def get_default_opacities(a, lam, bhmie_function=bhmie, return_all=False, extrapol=False):
     """
     Calculates opacities according to some specified method for
     a given size- and wavelength grid.
@@ -1012,6 +1095,9 @@ def get_default_opacities(a, lam, bhmie_function=bhmie, return_all=False):
         default False: return just kappa_abs, kappa_sca, rho_s
         True: return kappa_*, assymetry factor, S1, S2, and rho_s
 
+    extrapol : bool
+        whether to extrapolate if lam is outside the wavelength range of the data
+
     Output:
     -------
     kappa_abs, kappa_sca : arrays
@@ -1026,7 +1112,7 @@ def get_default_opacities(a, lam, bhmie_function=bhmie, return_all=False):
         material density of the grains [g/cm^3]
 
     """
-    diel_const, rho_s = get_default_diel_constants()
+    diel_const, rho_s = get_default_diel_constants(extrapol=extrapol)
 
     m = 4 * np.pi / 3. * rho_s * a**3
 

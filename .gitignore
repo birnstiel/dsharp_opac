@@ -1,1 +1,6 @@
 lp_opac.egg-info/
+lp_opac/bhmie_draine.cpython-36m-darwin.so
+lp_opac/bhmie_draine.cpython-36m-darwin.so.dSYM/
+build/
+lp_opac/__pycache__/
+
