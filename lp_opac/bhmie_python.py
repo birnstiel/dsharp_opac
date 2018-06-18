@@ -10,7 +10,7 @@ except ImportError:
 
 
 @njit
-def bhmie(x, refrel, theta):
+def bhmie_python(x, refrel, theta):
     """
     The famous Bohren and Huffman Mie scattering code.
     This version was ported to Python from the f77 code from Bruce

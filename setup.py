@@ -20,6 +20,6 @@ setup(name=PACKAGENAME,
       include_package_data=True,
       install_requires=['scipy', 'numpy', 'matplotlib'],
       zip_safe=False,
-      ext_modules=[Extension(name='lp_opac.bhmie_draine', sources=[
-              'lp_opac/bhmie_draine.f90'])],
+      ext_modules=[Extension(name='lp_opac.bhmie_fortran', sources=[
+              'lp_opac/bhmie_fortran.f90'])],
       )

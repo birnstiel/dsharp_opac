@@ -12,12 +12,12 @@ import warnings
 import pkg_resources
 
 try:
-    from .bhmie_draine import bhmie
+    from .bhmie_fortran import bhmie_fortran as bhmie_function
 except ImportError:
     warnings.warn('could not import compiled mie code - mie calculation will be slow')
-    from .bhmie import bhmie as bhmie_py
+    from .bhmie_python import _bhmie_p
 
-    def bhmie(x, nk, nangles):
+    def bhmie_function(x, nk, nangles):
         """
         wrapper for the python version to be callable just like the fortran version.
 
@@ -27,8 +27,8 @@ except ImportError:
         x : float
             size parameter 2 pi a / lambda
 
-        nk : tuple
-            n and k as tuple, not as complex value. ref. index = n + i * k
+        nk : complex
+            complex ref. index = n + i * k, e.g. `complex(1.,0.)`
 
         nangles : int
             number of angles between 0 and 180 degree for which to return S1 & S2
@@ -47,7 +47,7 @@ except ImportError:
             Henyey-Greenstein asymmetry factor
         """
         theta = np.linspace(0., 180., nangles + 1)
-        return bhmie_py(x, complex(nk[0], nk[1]), theta)
+        return _bhmie_p(x, nk, theta)
 
 try:
     import pymiecoated
@@ -59,8 +59,8 @@ try:
         x : float
             size parameter x = 2 pi a / lambda
 
-        nk : 2 element tuple
-            complex refractive index n + i k, first element n, second k
+        nk : complex
+            complex ref. index = n + i * k, e.g. `complex(1.,0.)`
 
         nangles : int
             number of angles between 0 and 180 degree for which to return S1 & S2
@@ -88,8 +88,8 @@ try:
         Qback = opac.qratio()
         gsca = opac.asy()
 
-        S1 = np.zeros(len(n_angles))
-        S2 = np.zeros(len(n_angles))
+        S1 = np.zeros(n_angles + 1, dtype=complex)
+        S2 = np.zeros(n_angles + 1, dtype=complex)
 
         angles = np.linspace(0., 180., n_angles + 1)
 
@@ -150,6 +150,7 @@ class diel_const(object):
     _lmin = None
     _lmax = None
     extrapol = False
+    _has_negative_n = False
 
     def __init__(self):
         """
@@ -177,7 +178,20 @@ class diel_const(object):
         """
         if np.array(l, ndmin=1).min() < self._lmin or np.array(l, ndmin=1).max() > self._lmax:
             raise NameError('{}: wavelength {:g} outside data-range [{:g},{:g}]'.format(type(self).__name__, l, self._lmin, self._lmax))
-        return 10.**np.interp(np.log10(l), self._ll, self._ln), 10.**np.interp(np.log10(l), self._ll, self._lk)
+
+        log_interp = True
+        if self._has_negative_n:
+            # estimate if log interpolation is ok to do
+            n = np.interp(l, self._l, self._n)
+            if n < 0:
+                log_interp = False
+
+        if log_interp:
+            result = 10.**np.interp(np.log10(l), self._ll, self._ln), 10.**np.interp(np.log10(l), self._ll, self._lk)
+        else:
+            result = np.interp(l, self._l, self._n), 10.**np.interp(np.log10(l), self._ll, self._lk)
+
+        return result
 
     def extrapolate_constants(self, lmin, lmax):
         """
@@ -188,6 +202,8 @@ class diel_const(object):
         # extrapolate
         #
         self.extrapol = True
+        if self._has_negative_n:
+            warnings.warn('Extrapolation for negative n values can cause issues')
 
         l_ext = np.logspace(np.log10(self._l[-1]), np.log10(lmax), 10)
         from scipy.optimize import curve_fit
@@ -263,11 +279,14 @@ class diel_from_lnk_file(diel_const):
         self._lmin = self._l.min()
         self._lmax = self._l.max()
 
+        if any(self._n <= 0):
+            self._has_negative_n = True
 
-class diel_wd03_sil(diel_const):
+
+class diel_draine2003_astrosil(diel_const):
     """
     Returns the dielectric constants for astronomical silicates from
-    Weingartner & Draine 2003. The data comes from callindex.out_sil.D03`
+    Draine 2003. The data comes from callindex.out_sil.D03`
     which was downloaded from
 
         ftp://ftp.astro.princeton.edu/draine/dust/diel/callindex.out_silD03
@@ -282,7 +301,7 @@ class diel_wd03_sil(diel_const):
         #
         # open file, read header and data
         #
-        self.material_str = 'Astronomical Silicates (Weingartner & Draine 2003)'
+        self.material_str = 'Astronomical Silicates (Draine 2003)'
         self.datafile = pkg_resources.resource_filename(__name__, os.path.join(
             'optical_constants', 'draine', 'callindex.out_silD03'))
         f = open(self.datafile)
@@ -301,15 +320,52 @@ class diel_wd03_sil(diel_const):
         self._lmax = self._l.max()
 
 
+class diel_WD2001_astrosil(diel_const):
+    """
+    Returns the dielectric constants for astronomical silicates from
+    Weingartner & Draine 2001. The data comes from file `eps_suvSil`
+    which was downloaded from
+
+        ftp://ftp.astro.princeton.edu/draine/dust/diel/eps_suvSil
+
+    on 2018-06-18--11:20 EDT
+    """
+
+    def __init__(self):
+        """
+        Overwrite the initialization of the parent class
+        """
+        #
+        # open file, read header and data
+        #
+        self.material_str = 'Astronomical Silicates (Weingartner & Draine 2001)'
+        self.datafile = pkg_resources.resource_filename(__name__, os.path.join(
+            'optical_constants', 'draine', 'eps_suvSil'))
+        f = open(self.datafile)
+        self.headerinfo = [f.readline() for i in range(9)]
+        data = np.loadtxt(f)
+        #
+        # assign wavelength and optical constants
+        #
+        self._l = data[-1::-1, 0] * 1e-4
+        self._n = data[-1::-1, 3] + 1.
+        self._k = data[-1::-1, 4]
+        self._ll = np.log10(self._l)
+        self._ln = np.log10(self._n)
+        self._lk = np.log10(self._k)
+        self._lmin = self._l.min()
+        self._lmax = self._l.max()
+
+
 class diel_dl84_astrosil(diel_const):
     """
     Returns the dielectric constants for astronomical silicates from
-    Draine & Lee 1984. The data comes from eps_Sil
+    Draine & Lee 1984 (and Laor & Draine 1993). The data comes from eps_Sil
     which was downloaded from
 
         ftp://ftp.astro.princeton.edu/draine/dust/diel/eps_Sil
 
-    on 2014-10-28--15:24 EDT
+    on 2018-06-18--11:35 EDT
     """
 
     def __init__(self):
@@ -331,6 +387,8 @@ class diel_dl84_astrosil(diel_const):
         self._l = data[::-1, 0] * 1e-4
         self._n = data[::-1, 1] + 1.
         self._k = data[::-1, 2]
+        if any(self._n <= 0):
+            self._has_negative_n = True
         self._ll = np.log10(self._l)
         self._ln = np.log10(self._n)
         self._lk = np.log10(self._k)
@@ -465,7 +523,10 @@ class diel_warren(diel_const):
         #
         # set the path and do some safety checks
         #
-        self.material_str = 'Water Ice (Warren, %s data)' % (new * 'new' + (not new) * 'old')
+        if new:
+            self.material_str = 'Water Ice (Warren & Brandt 2008)'
+        else:
+            self.material_str = 'Water Ice (Warren 1986)'
         #
         # set the file name
         #
@@ -822,7 +883,7 @@ def get_total_opacity(a, lam, n, rho_s, diel_constants, q_abs=None, q_sca=None):
     return kappa_abs_m, kappa_sca_m
 
 
-def get_opacity_from_distribution(a, lam, n, dc, rho_s, bhmie_function=bhmie):
+def get_opacity_from_distribution(a, lam, n, dc, rho_s, bhmie_function=bhmie_function):
     """
     A simple wrapper for the opacity functions: turns a given
     dielectric constant and a given size distribution into the
@@ -861,7 +922,7 @@ def get_opacity_from_distribution(a, lam, n, dc, rho_s, bhmie_function=bhmie):
     return kap_abs_t, kap_sca_t
 
 
-def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie, nang=3, return_all=False):
+def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function, nang=3, return_all=False):
     """
     This calculates the opacity for the given dielectric constants for all
     grain sizes and wavelength specified in LAM and A.
@@ -882,7 +943,7 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie, nang=3, r
 
     method: callable
     : a function that carries out the Mie calculation with this signature
-        S1, S2, Qext, Qabs, Qsca, Qback, gsca = bhmie(x, (n, k), n_angles)
+        S1, S2, Qext, Qabs, Qsca, Qback, gsca = bhmie_function(x, (n, k), n_angles)
 
     nang: int
     :    Number of angles for scattering function (not supported by all methods)
@@ -948,7 +1009,7 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie, nang=3, r
         # loop through the sizes
         #
         for ia, x in enumerate(X_cut):
-            S1, S2, Qext, Qabs, Qsca, Qback, gsca = bhmie_function(x, (n, k), nang)
+            S1, S2, Qext, Qabs, Qsca, Qback, gsca = bhmie_function(x, complex(n, k), nang)
             q_abs[ia, ilam] = Qabs
             q_sca[ia, ilam] = Qsca
             gg_sca[ia, ilam] = gsca.real
@@ -1049,15 +1110,15 @@ def get_default_diel_constants(extrapol=False):
     rho_s : float
         the material density of the particles in g/cm**3
     """
-    # c1 = diel_wd03_sil()
-    # c2 = diel_zubko_carbon(extrapol=True)
-    # c3 = diel_warren(new=False)
-    # c4 = diel_vacuum()
-
-    c1 = diel_luca('silicate', extrapol=extrapol, lmin=1e-6, lmax=100.0)
-    c2 = diel_luca('carbon', extrapol=extrapol, lmin=1e-6, lmax=100.0)
-    c3 = diel_luca('ice', extrapol=extrapol, lmin=1e-6, lmax=100.0)
+    c1 = diel_draine2003_astrosil()
+    c2 = diel_zubko_carbon(extrapol=True)
+    c3 = diel_warren(new=True)
     c4 = diel_vacuum()
+
+    # c1 = diel_luca('silicate', extrapol=extrapol, lmin=1e-6, lmax=100.0)
+    # c2 = diel_luca('carbon', extrapol=extrapol, lmin=1e-6, lmax=100.0)
+    # c3 = diel_luca('ice', extrapol=extrapol, lmin=1e-6, lmax=100.0)
+    # c4 = diel_vacuum()
     constants = [c1, c2, c3, c4]
 
     # after Lucas thesis, the fractions in Ricci+2010 are typos
@@ -1071,7 +1132,7 @@ def get_default_diel_constants(extrapol=False):
     return diel_constants, rho_s
 
 
-def get_default_opacities(a, lam, bhmie_function=bhmie, return_all=False, extrapol=False):
+def get_default_opacities(a, lam, bhmie_function=bhmie_function, return_all=False, extrapol=False):
     """
     Calculates opacities according to some specified method for
     a given size- and wavelength grid.
