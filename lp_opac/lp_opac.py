@@ -140,6 +140,9 @@ def download(packagedir):
     import os
     from urllib.request import urlretrieve
 
+    if not os.path.isdir(packagedir):
+        packagedir = os.path.dirname(packagedir)
+
     with open(os.path.join(packagedir, 'links.json')) as f:
         data = json.load(f)
         for material, link in data.items():
@@ -372,6 +375,8 @@ class diel_henning(diel_const):
 
         self.datafile = pkg_resources.resource_filename(__name__, os.path.join(
             'optical_constants', 'henning', 'new' * new + 'old' * (not new), fname + '.lnk'))
+        if not os.path.isfile(self.datafile):
+            self.download()
         #
         # read data
         #
@@ -389,7 +394,7 @@ class diel_henning(diel_const):
         self._lmin = self._l.min()
         self._lmax = self._l.max()
 
-    def download():
+    def download(self):
         for i in ['old', 'new']:
             path = pkg_resources.resource_filename(__name__, os.path.join('optical_constants', 'henning', i))
             download(path)
@@ -416,6 +421,8 @@ class diel_draine2003_astrosil(diel_const):
         self.material_str = 'Astronomical Silicates (Draine 2003)'
         self.datafile = pkg_resources.resource_filename(__name__, os.path.join(
             'optical_constants', 'draine', 'callindex.out_silD03'))
+        if not os.path.isfile(self.datafile):
+            download(os.path.dirname(self.datafile))
         f = open(self.datafile)
         self.headerinfo = [f.readline() for i in range(5)]
         data = np.loadtxt(f)
@@ -453,6 +460,8 @@ class diel_WD2001_astrosil(diel_const):
         self.material_str = 'Astronomical Silicates (Weingartner & Draine 2001)'
         self.datafile = pkg_resources.resource_filename(__name__, os.path.join(
             'optical_constants', 'draine', 'eps_suvSil'))
+        if not os.path.isfile(self.datafile):
+            download(os.path.dirname(self.datafile))
         f = open(self.datafile)
         self.headerinfo = [f.readline() for i in range(9)]
         data = np.loadtxt(f)
@@ -491,6 +500,8 @@ class diel_dl84_astrosil(diel_const):
         self.datafile = pkg_resources.resource_filename(
             __name__, os.path.join('optical_constants', 'draine', 'eps_Sil'))
         f = open(self.datafile)
+        if not os.path.isfile(self.datafile):
+            download(os.path.dirname(self.datafile))
         self.headerinfo = [f.readline() for i in range(6)]
         data = np.loadtxt(f)
         #
@@ -649,6 +660,8 @@ class diel_warren(diel_const):
             fname = 'warren_1986.txt'
         self.datafile = pkg_resources.resource_filename(
             __name__, os.path.join('optical_constants', 'warren', fname))
+        if not os.path.isfile(self.datafile):
+            download(self.datafile)
         #
         # read data and assign wavelength and optical constants
         #
