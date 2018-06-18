@@ -573,6 +573,7 @@ class diel_zubko_carbon(diel_const):
         # extrapolate
         #
         if extrapol:
+            self.extrapol = True
             le = np.logspace(np.log10(l[-1]), np.log10(lmax), 10)
             from scipy.optimize import curve_fit
 
@@ -1195,7 +1196,7 @@ def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False):
     ax.legend(loc='best')
 
 
-def get_default_diel_constants(extrapol=False):
+def get_default_diel_constants(extrapol=False, lmax=None):
     """
     This method calculates the mixed mie coefficients as in Ricci et al. 2010.
 
@@ -1222,8 +1223,11 @@ def get_default_diel_constants(extrapol=False):
     rho_s : float
         the material density of the particles in g/cm**3
     """
+    if extrapol and (lmax is None):
+        raise ValueError('need to set lmax if extrapol is True')
+
     c1 = diel_draine2003_astrosil()
-    c2 = diel_zubko_carbon(extrapol=True)
+    c2 = diel_zubko_carbon(extrapol=extrapol, lmax=lmax)
     c3 = diel_warren(new=True)
     c4 = diel_vacuum()
 
@@ -1285,7 +1289,7 @@ def get_default_opacities(a, lam, bhmie_function=bhmie_function, return_all=Fals
         material density of the grains [g/cm^3]
 
     """
-    diel_const, rho_s = get_default_diel_constants(extrapol=extrapol)
+    diel_const, rho_s = get_default_diel_constants(extrapol=extrapol, lmax=lam[-1])
 
     m = 4 * np.pi / 3. * rho_s * a**3
 
