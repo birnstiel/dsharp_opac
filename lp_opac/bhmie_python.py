@@ -164,7 +164,7 @@ def bhmie_python(x, refrel, theta):
     #
     # Now do the final calculations
     #
-    gsca  = 2 * gsca.real / Qsca
+    gsca  = 2 * gsca / Qsca
     Qsca  = (2.0 / (x * x)) * Qsca
     Qext  = (4.0 / (x * x)) * S1[iang0].real
     Qback = (abs(S1[iang180]) / x)**2 / np.pi
@@ -172,4 +172,4 @@ def bhmie_python(x, refrel, theta):
     #
     # Return results
     #
-    return S1, S2, Qext, Qabs, Qsca, Qback, gsca
+    return S1, S2, Qext, Qabs, Qsca, Qback, gsca.real
