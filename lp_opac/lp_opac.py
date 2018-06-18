@@ -131,6 +131,30 @@ def progress_bar(perc, text=''):
         sys.stdout.flush()
 
 
+def download(packagedir):
+    """
+    Downloads the optical constants files. It works by getting the data from
+    a json file `links.json` in `packagedir`.
+    """
+    import json
+    import os
+    from urllib.request import urlretrieve
+
+    with open(os.path.join(packagedir, 'links.json')) as f:
+        data = json.load(f)
+        for material, link in data.items():
+
+            filename = link.split('/')[-1]
+
+            print(f'material: {material}, downloading {filename}: ... ', end='')
+            try:
+                urlretrieve(link, filename=os.path.join(packagedir, filename))
+                print('Done!')
+            except Exception as ex:
+                print('Failed!')
+                raise ex
+
+
 class diel_const(object):
     """
     Abstract class for dielectric constants objects
@@ -281,6 +305,94 @@ class diel_from_lnk_file(diel_const):
 
         if any(self._n <= 0):
             self._has_negative_n = True
+
+
+class diel_henning(diel_const):
+    """
+    Returns the dielectric constants for the various optical constants
+    from Thomas Hennings website.
+
+    Arguments:
+    ----------
+
+    species : str
+    :    name of the species to read. Possible choices are
+         iron,olivine,organics,orthopyroxene,troilite,waterice
+
+
+    Keywords:
+    ---------
+
+    type : str
+    :    only for olivine and orthopyroxene decide between
+         'low'    = low iron abundance
+         'normal' = normal iron abundance
+         'high'   = high iron abundance
+
+    new : bool
+    :    use the old version of the constants, for this case,
+         only normal iron abundance is avaliable
+
+    """
+
+    def __init__(self, species, iron_abundance='normal', new=True):
+        """
+        Overwrite the initialization of the parent class
+        """
+        #
+        # set the path and do some safety checks
+        #
+        self.material_str = species[0].upper() + species[1:] + ' (Henning)'
+
+        if iron_abundance not in ['normal', 'low', 'high']:
+            raise NameError('unknown iron abundance')
+        if species not in ['iron', 'olivine', 'organics', 'orthopyroxene', 'troilite', 'waterice']:
+            raise NameError('unknown abundance species')
+        if (iron_abundance != 'normal') and ((not new) or (species not in ['olivine', 'orthopyroxene'])):
+            raise NameError('low & high iron only available for new olivine and new orthopyroxene')
+        #
+        # set the file name
+        #
+        if species in ['iron', 'organics', 'troilite', 'waterice']:
+            fname = species + new * 'k'
+        elif species == 'olivine':
+            if iron_abundance == 'normal':
+                fname = new * 'olmg70k' + (not new) * 'olivine'
+            elif iron_abundance == 'low':
+                fname = 'olivine100k'
+            elif iron_abundance == 'high':
+                fname = 'olmg60k'
+        elif species == 'orthopyroxene':
+            if iron_abundance == 'normal':
+                fname = new * 'pyrmg70k' + (not new) * 'orthopyr'
+            elif iron_abundance == 'low':
+                fname = 'pyrmg100k'
+            elif iron_abundance == 'high':
+                fname = 'pyrmg60k'
+
+        self.datafile = pkg_resources.resource_filename(__name__, os.path.join(
+            'optical_constants', 'henning', 'new' * new + 'old' * (not new), fname + '.lnk'))
+        #
+        # read data
+        #
+        print('Reading opacities from %s' % fname)
+        data = np.loadtxt(self.datafile)
+        #
+        # assign wavelength and optical constants
+        #
+        self._l = data[:, 0] * 1e-4
+        self._n = data[:, 1]
+        self._k = data[:, 2]
+        self._ll = np.log10(self._l)
+        self._ln = np.log10(self._n)
+        self._lk = np.log10(self._k)
+        self._lmin = self._l.min()
+        self._lmax = self._l.max()
+
+    def download():
+        for i in ['old', 'new']:
+            path = pkg_resources.resource_filename(__name__, os.path.join('optical_constants', 'henning', i))
+            download(path)
 
 
 class diel_draine2003_astrosil(diel_const):

@@ -1,0 +1,12 @@
+{
+    "Olivine (normal)": "http://www2.mpia-hd.mpg.de/home/henning/Dust_opacities/Opacities/RI/olmg70k.lnk",
+    "Olivine (low)": "http://www2.mpia-hd.mpg.de/home/henning/Dust_opacities/Opacities/RI/olivinenewk.lnk",
+    "Olivine (high)": "http://www2.mpia-hd.mpg.de/home/henning/Dust_opacities/Opacities/RI/olmg60k.lnk",
+    "Orthopyroxene (normal)": "http://www2.mpia-hd.mpg.de/home/henning/Dust_opacities/Opacities/RI/pyrmg70k.lnk",
+    "Orthopyroxene (low)": "http://www2.mpia-hd.mpg.de/home/henning/Dust_opacities/Opacities/RI/pyrmg100k.lnk",
+    "Orthopyroxene (high)": "http://www2.mpia-hd.mpg.de/home/henning/Dust_opacities/Opacities/RI/pyrmg60k.lnk",
+    "Iron": "http://www2.mpia-hd.mpg.de/home/henning/Dust_opacities/Opacities/RI/ironk.lnk",
+    "Troilite": "http://www2.mpia-hd.mpg.de/home/henning/Dust_opacities/Opacities/RI/troilitek.lnk",
+    "Organics": "http://www2.mpia-hd.mpg.de/home/henning/Dust_opacities/Opacities/RI/organicsk.lnk",
+    "Water Ice": "http://www2.mpia-hd.mpg.de/home/henning/Dust_opacities/Opacities/RI/watericek.lnk"
+}

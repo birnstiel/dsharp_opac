@@ -1,0 +1,8 @@
+{
+    "Olivine": "http://www2.mpia-hd.mpg.de/home/henning/Dust_opacities/Opacities/RI/olivine.lnk",
+    "Orthopyroxene": "http://www2.mpia-hd.mpg.de/home/henning/Dust_opacities/Opacities/RI/orthopyr.lnk",
+    "Iron": "http://www2.mpia-hd.mpg.de/home/henning/Dust_opacities/Opacities/RI/iron.lnk",
+    "Troilite": "http://www2.mpia-hd.mpg.de/home/henning/Dust_opacities/Opacities/RI/troilite.lnk",
+    "Organics": "http://www2.mpia-hd.mpg.de/home/henning/Dust_opacities/Opacities/RI/organics.lnk",
+    "Water Ice": "http://www2.mpia-hd.mpg.de/home/henning/Dust_opacities/Opacities/RI/waterice.lnk"
+}
