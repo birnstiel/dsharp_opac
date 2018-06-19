@@ -263,6 +263,7 @@ class diel_const(object):
         self._lk = np.log10(self._k)
         self._lmin = self._l.min()
         self._lmax = self._l.max()
+        self.material_str += ' - extrapolated'
 
 
 class diel_from_lnk_file(diel_const):
@@ -561,7 +562,7 @@ class diel_zubko_carbon(diel_const):
         upper limit for extrapolation range
     """
 
-    def __init__(self, sample='ACH2', extrapol=False, lmax=1.0):
+    def __init__(self, sample='ACH2', extrapol=False, lmin=4.765e-2, lmax=1.0):
         """
         Overwrite the initialization of the parent class
         """
@@ -581,31 +582,6 @@ class diel_zubko_carbon(diel_const):
             __name__, os.path.join(self.datafile, f'zubko_k_{sample}.txt')))[-1::-1]
         l = 0.00012398419292004205 / E  # E = h*c/lambda in CGS # noqa
         #
-        # extrapolate
-        #
-        if extrapol:
-            self.extrapol = True
-            le = np.logspace(np.log10(l[-1]), np.log10(lmax), 10)
-            from scipy.optimize import curve_fit
-
-            def f(x, a, b, c):
-                return a + b * x + c * x**2
-
-            i_min = abs(l - 1e-2).argmin()
-            #
-            # extrapolate n
-            #
-            res = curve_fit(f, np.log10(l[i_min:]), np.log10(n[i_min:]), [np.log10(n[-1]), 1, 0])
-            ne = 10.**f(np.log10(le), *res[0])
-            n = np.append(n, ne)
-            #
-            # extrapolate k
-            #
-            res = curve_fit(f, np.log10(l[i_min:]), np.log10(k[i_min:]), [np.log10(k[-1]), 1, 0])
-            ke = 10.**f(np.log10(le), *res[0])
-            k = np.append(k, ke)
-            l = np.append(l, le) # noqa
-        #
         # assign wavelength and optical constants
         #
         self._l = l
@@ -617,11 +593,14 @@ class diel_zubko_carbon(diel_const):
         self._lmin = self._l.min()
         self._lmax = self._l.max()
 
+        if extrapol:
+            self.extrapolate_constants(lmin, lmax)
+
 
 class diel_warren(diel_const):
     """
     Returns the dielectric constants for water ice according
-    to the data by Warren 1986 or the newer version
+    to the data by Warren 1984 or the newer version
 
     the new, updated data was downloaded from
 
@@ -650,14 +629,14 @@ class diel_warren(diel_const):
         if new:
             self.material_str = 'Water Ice (Warren & Brandt 2008)'
         else:
-            self.material_str = 'Water Ice (Warren 1986)'
+            self.material_str = 'Water Ice (Warren 1984)'
         #
         # set the file name
         #
         if new:
             fname = 'IOP_2008_ASCIItable.dat'
         else:
-            fname = 'warren_1986.txt'
+            fname = 'warren_1984.txt'
         self.datafile = pkg_resources.resource_filename(
             __name__, os.path.join('optical_constants', 'warren', fname))
         if not os.path.isfile(self.datafile):
@@ -953,7 +932,7 @@ def get_kappa_from_q(a, m, q_abs, q_sca):
     ----------
 
     q_abs, q_sca : arrays
-        absorption and scattering coefficients, shape (n_wavelength, n_sizes)
+        absorption and scattering coefficients, shape (n_sizes, n_wavelength)
 
     a, m: arrays
         particle size and particle mass arrays
@@ -964,7 +943,7 @@ def get_kappa_from_q(a, m, q_abs, q_sca):
     kappa_abs, kappa_sca : arrays
         opacities in units of [cm^2/g]
     """
-    n_lam = q_abs.size[0]
+    n_lam = q_abs.shape[1]
     kappa_abs = q_abs * np.tile(np.pi * a**2 / m, [n_lam, 1]).transpose()
     kappa_sca = q_sca * np.tile(np.pi * a**2 / m, [n_lam, 1]).transpose()
     return kappa_abs, kappa_sca
@@ -1153,7 +1132,7 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function, 
         return q_abs, q_sca
 
 
-def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False):
+def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False, ax=None):
     """
     Compares the dielectric functions c1 and c2 (their n and k values)
     by plotting them on the range from amin to amax.
@@ -1176,6 +1155,9 @@ def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False):
     orig_data : bool
         if true, then just plot the original data of each object
 
+    ax : plt.axes
+        plot into those axes, or create new figure/axes
+
     Output:
     -------
     A plot comparing both optical property functions
@@ -1185,7 +1167,8 @@ def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False):
     nlam = 100
     lam = np.logspace(np.log10(lmin), np.log10(lmax), nlam)
 
-    f, ax = plt.subplots()
+    if ax is None:
+        f, ax = plt.subplots()
 
     for n, c in enumerate(constants):
         nk = np.zeros([len(lam), 2])
@@ -1208,6 +1191,8 @@ def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False):
     ax.set_xlabel('wavelength [cm]')
     ax.set_ylabel('$n, k$')
     ax.legend(loc='best')
+
+    return ax
 
 
 def get_default_diel_constants(extrapol=False, lmax=None):
@@ -1314,7 +1299,10 @@ def get_opacities(a, lam, rho_s=None, diel_const=None, bhmie_function=bhmie_func
     """
     if (diel_const is None and rho_s is not None) or (diel_const is not None and rho_s is None):
         raise AssertionError('diel_const and rho_s need to be both given or both be None')
+
     if diel_const is None and rho_s is None:
+        if extrapol:
+            print('Note: wavelength range outside data. Extrapolation will be done but is uncertain.')
         diel_const, rho_s = get_default_diel_constants(extrapol=extrapol, lmax=lam[-1])
 
     m = 4 * np.pi / 3. * rho_s * a**3
