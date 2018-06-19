@@ -404,12 +404,14 @@ class diel_henning(diel_const):
 class diel_draine2003_astrosil(diel_const):
     """
     Returns the dielectric constants for astronomical silicates from
-    Draine 2003. The data comes from callindex.out_sil.D03`
+    Draine 2003 [1]. The data comes from callindex.out_sil.D03`
     which was downloaded from
 
         ftp://ftp.astro.princeton.edu/draine/dust/diel/callindex.out_silD03
 
     on 2014-01-21--17:16 EDT
+
+    Reference: [1] https://dx.doi.org/10.1086/379123
     """
 
     def __init__(self):
@@ -543,8 +545,10 @@ class diel_vacuum(diel_const):
 class diel_zubko_carbon(diel_const):
     """
     Returns the dielectric constants for carbon grains from Zubko et
-    al. 1996 (the BE, ACH2 values). The data was OCRed by Til Birnstiel, no
+    al. 1996 [1] (the BE, ACH2 values). The data was OCRed by Til Birnstiel, no
     guarantee for correctness.
+
+    Reference: [1] https://dx.doi.org/10.1093/mnras/282.4.1321
 
     Arguments:
     ----------
@@ -600,16 +604,21 @@ class diel_zubko_carbon(diel_const):
 class diel_warren(diel_const):
     """
     Returns the dielectric constants for water ice according
-    to the data by Warren 1984 or the newer version
+    to the data by Warren 1984 [1] or the newer version
 
     the new, updated data was downloaded from
 
         http://www.atmos.washington.edu/ice_optical_constants/
 
-    on Jan 23, 2014 and is based on Warren & Brandt (2008).
+    on Jan 23, 2014 and is based on Warren & Brandt (2008) [2].
 
     The old data was taken from the journal website, where
     the coldest temperature column was used.
+
+    References:
+
+    - [1]  https://dx.doi.org/10.1364/AO.23.001206
+    - [2]  https://dx.doi.org/10.1029/2007JD009744
 
     Keywords:
     ---------
@@ -1230,10 +1239,6 @@ def get_default_diel_constants(extrapol=False, lmax=None):
     c3 = diel_warren(new=True)
     c4 = diel_vacuum()
 
-    # c1 = diel_luca('silicate', extrapol=extrapol, lmin=1e-6, lmax=100.0)
-    # c2 = diel_luca('carbon', extrapol=extrapol, lmin=1e-6, lmax=100.0)
-    # c3 = diel_luca('ice', extrapol=extrapol, lmin=1e-6, lmax=100.0)
-    # c4 = diel_vacuum()
     constants = [c1, c2, c3, c4]
 
     # after Lucas thesis, the fractions in Ricci+2010 are typos
