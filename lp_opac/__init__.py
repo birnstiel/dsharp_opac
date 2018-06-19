@@ -1,33 +1,49 @@
 from .bhmie_python import bhmie_python
 from .bhmie_fortran import bhmie_fortran
-from .lp_opac import compare_nk, diel_luca, diel_const, diel_mixed, \
-    diel_vacuum, diel_warren, diel_draine2003_astrosil, diel_WD2001_astrosil, \
-    diel_zubko_carbon, diel_dl84_astrosil, diel_from_lnk_file, \
-    gaussian_N_of_a, get_default_diel_constants, get_default_opacities, \
-    get_opacity_from_distribution, get_total_opacity, powerlaw_N_of_a, \
-    diel_henning, download
+
+from .lp_opac import \
+    progress_bar, \
+    diel_const, \
+    diel_from_lnk_file, \
+    diel_henning, \
+    diel_draine2003_astrosil, \
+    diel_WD2001_astrosil, \
+    diel_dl84_astrosil, \
+    diel_vacuum, \
+    diel_zubko_carbon, \
+    diel_warren, \
+    diel_luca, \
+    diel_mixed, \
+    powerlaw_N_of_a, \
+    gaussian_N_of_a, \
+    get_kappa_from_q, \
+    get_size_averaged_opacity, \
+    get_mie_coefficients, \
+    compare_nk, \
+    get_default_diel_constants, \
+    get_opacities
 
 __all__ = [
     'bhmie_python',
     'bhmie_fortran',
-    'compare_nk',
-    'diel_luca',
+    'progress_bar',
     'diel_const',
-    'diel_mixed',
-    'diel_vacuum',
-    'diel_warren',
+    'diel_from_lnk_file',
+    'diel_henning',
     'diel_draine2003_astrosil',
     'diel_WD2001_astrosil',
-    'diel_zubko_carbon',
     'diel_dl84_astrosil',
-    'diel_from_lnk_file',
-    'gaussian_N_of_a',
-    'get_default_diel_constants',
-    'get_default_opacities',
-    'get_default_diel_constants',
-    'get_opacity_from_distribution',
-    'get_total_opacity',
+    'diel_vacuum',
+    'diel_zubko_carbon',
+    'diel_warren',
+    'diel_luca',
+    'diel_mixed',
     'powerlaw_N_of_a',
-    'diel_henning',
-    'download'
+    'gaussian_N_of_a',
+    'get_kappa_from_q',
+    'get_size_averaged_opacity',
+    'get_mie_coefficients',
+    'compare_nk',
+    'get_default_diel_constants',
+    'get_opacities'
     ]
