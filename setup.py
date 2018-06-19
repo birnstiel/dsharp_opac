@@ -18,6 +18,7 @@ setup(name=PACKAGENAME,
       license='GPLv3',
       packages=[PACKAGENAME],
       include_package_data=True,
+      package_data={PACKAGENAME: ['optical_constants/*/*', 'optical_constants/*/*/*']},
       install_requires=['scipy', 'numpy', 'matplotlib'],
       zip_safe=False,
       ext_modules=[Extension(name='lp_opac.bhmie_fortran', sources=[

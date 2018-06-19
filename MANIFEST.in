@@ -1,3 +1,4 @@
 include README.md
 include LICENSE
-include optical_constants/*
+include lp_opac/optical_constants/*/*
+include lp_opac/optical_constants/*/*/*

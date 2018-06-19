@@ -944,7 +944,34 @@ def gaussian_N_of_a(a, a_mean, sigma_a, rho_s):
     return dist
 
 
-def get_total_opacity(a, lam, n, rho_s, diel_constants, q_abs=None, q_sca=None):
+def get_kappa_from_q(a, m, q_abs, q_sca):
+    """
+    Converts absorption and scattering coefficients [unitless] to absorption and
+    scattering opacities [cm^2/g].
+
+    Arguments:
+    ----------
+
+    q_abs, q_sca : arrays
+        absorption and scattering coefficients, shape (n_wavelength, n_sizes)
+
+    a, m: arrays
+        particle size and particle mass arrays
+
+    Output:
+    -------
+
+    kappa_abs, kappa_sca : arrays
+        opacities in units of [cm^2/g]
+    """
+    n_lam = q_abs.size[0]
+    kappa_abs = q_abs * np.tile(np.pi * a**2 / m, [n_lam, 1]).transpose()
+    kappa_sca = q_sca * np.tile(np.pi * a**2 / m, [n_lam, 1]).transpose()
+    return kappa_abs, kappa_sca
+
+
+def get_size_averaged_opacity(a, lam, n, rho_s, diel_const=None, q_abs=None,
+                              q_sca=None, k_abs=None, k_sca=None):
     """
     Averages the opacity over the given size distribution.
 
@@ -963,11 +990,19 @@ def get_total_opacity(a, lam, n, rho_s, diel_constants, q_abs=None, q_sca=None):
     rho_s : float
         the material density of the dust grains
 
-    diel_constants : object of class diel_const
-        the dielectric constants to be used
 
     Keywords:
     ---------
+
+    One of the following three options has to be given:
+
+    diel_const : object of class diel_const
+        the dielectric constants to be used
+
+    q_abs,q_sca : array
+        if the opacity coefficients for all sizes and wavelength has already
+        been calculated, then you can pass it along, otherwise
+        it will be calculated on the fly.
 
     q_abs,q_sca : array
         if the opacity for all sizes and wavelength has already
@@ -978,28 +1013,31 @@ def get_total_opacity(a, lam, n, rho_s, diel_constants, q_abs=None, q_sca=None):
     -------
     kappa_abs,kappa_sca : array
         the opacity at each wavelength averaged over the size
-        distribution and normalized be per 1 g of dust.
+        distribution and normalized per 1 g of dust.
     """
-    from numpy import zeros, log
+    assert (diel_const is not None), "diel_const needs to be "
+
+    if (q_abs is None or q_sca is None) and (k_abs is None or k_sca is None) \
+            and (diel_const is None):
+        raise AssertionError('Either (diel_const) or (q_abs, q_sca) or (k_abs, k_sca) needed as input')
     #
     # some basic conversions
     #
     m = 4. * np.pi / 3. * rho_s * a**3
-    C = log(a[2] / a[1])
-    sig = n * m * a * C
+    sig = n * m * a
     sig = sig / sum(sig)
     #
     # calculate the opacities ...
     #
-    if q_abs is None or q_sca is None:
-        q_abs, q_sca = get_mie_coefficients(a, lam, diel_constants)
-    kappa_abs = q_abs * np.tile(np.pi * a**2 / m, [len(lam), 1]).transpose()
-    kappa_sca = q_sca * np.tile(np.pi * a**2 / m, [len(lam), 1]).transpose()
+    if (q_abs is None or q_sca is None) and (k_abs is None or k_sca is None):
+        q_abs, q_sca = get_mie_coefficients(a, lam, diel_const)
+    elif (k_abs is None or k_sca is None):
+        kappa_abs, kappa_sca = get_kappa_from_q(a, m, q_abs, q_sca)
     #
     # ... average them over the size distribution ...
     #
-    kappa_abs_m = zeros(len(lam))
-    kappa_sca_m = zeros(len(lam))
+    kappa_abs_m = np.zeros(len(lam))
+    kappa_sca_m = np.zeros(len(lam))
     for i in np.arange(len(lam)):
         kappa_abs_m[i] = sum(np.transpose(kappa_abs[:, i]) * sig, 0)
         kappa_sca_m[i] = sum(np.transpose(kappa_sca[:, i]) * sig, 0)
@@ -1007,45 +1045,6 @@ def get_total_opacity(a, lam, n, rho_s, diel_constants, q_abs=None, q_sca=None):
     # ... and return them
     #
     return kappa_abs_m, kappa_sca_m
-
-
-def get_opacity_from_distribution(a, lam, n, dc, rho_s, bhmie_function=bhmie_function):
-    """
-    A simple wrapper for the opacity functions: turns a given
-    dielectric constant and a given size distribution into the
-    size-averaged opacities on a given wavelength grid
-
-    Arguments:
-    ----------
-    a : array
-    :    grain size grid in cm
-
-    lam : array
-    :    wavelength grid in cm
-
-    n : array
-    :    grain size distribution n(a) in cm^-3
-
-    dc : instance of class diel_const
-    :    the n and k values to use
-
-    rho_s : float
-    :    the material density of the grains
-
-    Keywords:
-    ---------
-    method : str
-    :     which of the bhmie codes to use
-
-    Returns:
-    --------
-    kap_abs_t,kap_sca_t : arrays
-    :    the absorption and scattering opacity in cm^2/g
-
-    """
-    q_abs, q_sca = get_mie_coefficients(a, lam, dc, bhmie_function=bhmie_function)
-    kap_abs_t, kap_sca_t = get_total_opacity(a, lam, n, rho_s, None, q_abs=q_abs, q_sca=q_sca)
-    return kap_abs_t, kap_sca_t
 
 
 def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function, nang=3, return_all=False):
@@ -1191,7 +1190,7 @@ def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False):
     for n, c in enumerate(constants):
         nk = np.zeros([len(lam), 2])
 
-        if orig_data:
+        if orig_data and (c._n is not None) and (c._l is not None):
             lam = c._l
             nk = np.array([c._n, c._k]).T
         else:
@@ -1201,8 +1200,10 @@ def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False):
                 except BaseException:
                     nk[i] = np.nan
 
-        ax.loglog(lam, nk[:, 0], label='$n_1$ - {}'.format(c.material_str), c=f'C{n}', alpha=0.7, ls='-')
-        ax.loglog(lam, nk[:, 1], label='$k_1$ - {}'.format(c.material_str), c=f'C{n}', alpha=0.7, ls='--')
+        mask = np.invert(np.isnan(nk[:, 0]))
+        ax.loglog(lam[mask], nk[:, 0][mask], label='$n_1$ - {}'.format(c.material_str), c=f'C{n}', alpha=0.7, ls='-')
+        mask = np.invert(np.isnan(nk[:, 1]))
+        ax.loglog(lam[mask], nk[:, 1][mask], label='$k_1$ - {}'.format(c.material_str), c=f'C{n}', alpha=0.7, ls='--')
 
     ax.set_xlabel('wavelength [cm]')
     ax.set_ylabel('$n, k$')
@@ -1261,10 +1262,12 @@ def get_default_diel_constants(extrapol=False, lmax=None):
     return diel_constants, rho_s
 
 
-def get_default_opacities(a, lam, bhmie_function=bhmie_function, return_all=False, extrapol=False):
+def get_opacities(a, lam, rho_s=None, diel_const=None, bhmie_function=bhmie_function,
+                  return_all=False, extrapol=False):
     """
     Calculates opacities according to some specified method for
-    a given size- and wavelength grid.
+    a given size- and wavelength grid. If diel_const and rho_s is not given,
+    default opacities are used. Otherwise both rho_s and diel_const are needed.
 
     Arguments:
     ----------
@@ -1278,6 +1281,12 @@ def get_default_opacities(a, lam, bhmie_function=bhmie_function, return_all=Fals
     Keywords:
     ---------
 
+    diel_const : dielectric constant
+        in case other dielectric constants should be used
+
+    rho_s : float
+        material density of each size [g/cm^3]
+
     bhmie_function : callable
         which function to use for the mie calculation
 
@@ -1286,7 +1295,8 @@ def get_default_opacities(a, lam, bhmie_function=bhmie_function, return_all=Fals
         True: return kappa_*, assymetry factor, S1, S2, and rho_s
 
     extrapol : bool
-        whether to extrapolate if lam is outside the wavelength range of the data
+        whether to extrapolate default optical constants if lam is outside the
+        wavelength range of the data
 
     Output:
     -------
@@ -1302,14 +1312,16 @@ def get_default_opacities(a, lam, bhmie_function=bhmie_function, return_all=Fals
         material density of the grains [g/cm^3]
 
     """
-    diel_const, rho_s = get_default_diel_constants(extrapol=extrapol, lmax=lam[-1])
+    if (diel_const is None and rho_s is not None) or (diel_const is not None and rho_s is None):
+        raise AssertionError('diel_const and rho_s need to be both given or both be None')
+    if diel_const is None and rho_s is None:
+        diel_const, rho_s = get_default_diel_constants(extrapol=extrapol, lmax=lam[-1])
 
     m = 4 * np.pi / 3. * rho_s * a**3
 
     q_abs, q_sca, gg_sca, s_1, s_2 = get_mie_coefficients(a, lam, diel_const, return_all=True, bhmie_function=bhmie_function)
 
-    kappa_abs = q_abs * np.tile(np.pi * a**2 / m, [len(lam), 1]).transpose()
-    kappa_sca = q_sca * np.tile(np.pi * a**2 / m, [len(lam), 1]).transpose()
+    kappa_abs, kappa_sca = get_kappa_from_q(a, m, q_abs, q_sca)
 
     if return_all:
         return kappa_abs, kappa_sca, gg_sca, s_1, s_2, rho_s
