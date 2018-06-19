@@ -9,7 +9,7 @@ PACKAGENAME = 'lp_opac'
 
 setup(name=PACKAGENAME,
       description='python routines to calculate mie opacities',
-      version='0.0.4',
+      version='0.0.5',
       long_description=open(os.path.join(
           os.path.dirname(__file__), 'README.md')).read(),
       url='https://github.com/seanandrews/p484',

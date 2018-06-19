@@ -2,3 +2,4 @@ lp_opac.egg-info/
 lp_opac/bhmie_fortran.cpython*
 build/
 lp_opac/__pycache__/
+tests/.ipynb_checkpoints

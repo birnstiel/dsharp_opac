@@ -2,3 +2,4 @@ include README.md
 include LICENSE
 include lp_opac/optical_constants/*/*
 include lp_opac/optical_constants/*/*/*
+include tests/opacity_package_tests.ipynb
