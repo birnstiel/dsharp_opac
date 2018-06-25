@@ -1072,18 +1072,18 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function, 
     if return_all is true, the output is
     q_abs,q_sca, gg_sca, s_1, s_2
     """
-    from numpy import zeros, maximum
     from scipy.optimize import fsolve
     #
     # feed the bhmie function
     # use the first entries
     #
-    q_abs = zeros([len(A), len(LAM)])
-    q_sca = zeros([len(A), len(LAM)])
-    gg_sca = zeros([len(A), len(LAM)])
-    s_1 = zeros([len(A), len(LAM), nang], dtype=complex)
-    s_2 = zeros([len(A), len(LAM), nang], dtype=complex)
+    q_abs = np.zeros([len(A), len(LAM)])
+    q_sca = np.zeros_like(q_abs)
+    gg_sca = np.zeros_like(q_abs)
+    s_1 = np.zeros([len(A), len(LAM), nang], dtype=complex)
+    s_2 = np.zeros([len(A), len(LAM), nang], dtype=complex)
     NMXX = 200000
+    full_mask = np.zeros_like(q_abs)
     #
     # the wave length loop
     #
@@ -1106,8 +1106,9 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function, 
         Y = X * (n + k * 1j)
         Y = abs(Y)
         Xstop = X + 4. * X**.333333 + 2.0
-        nmx = maximum(Xstop, Y).astype(int) + 15
+        nmx = np.maximum(Xstop, Y).astype(int) + 15
         mask = nmx < NMXX
+        full_mask[:, ilam] = mask
         #
         # cut it such that only converging terms are included
         # and extrapolate the missing parts (see below)
@@ -1119,7 +1120,7 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function, 
             x_max = fsolve(f, NMXX)  # /30.
             X_cut = [x_max]
         #
-        # loop through the sizes
+        # loop through the sizes that converge
         #
         for ia, x in enumerate(X_cut):
             S1, S2, Qext, Qabs, Qsca, Qback, gsca = bhmie_function(x, complex(n, k), nang)
@@ -1139,6 +1140,124 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function, 
         return q_abs, q_sca, gg_sca, s_1, s_2
     else:
         return q_abs, q_sca
+
+
+def calculate_mueller_matrix(lam, m, S1, S2):
+    """
+    Calculate the Mueller matrix elements given the scattering amplitudes
+    S1 and S2.
+
+    Arguments:
+    ----------
+
+    lam : array
+        wavelength array of length nlam
+
+    m : array
+        particle mass array of length nm
+
+    S1, S2 : arrays
+        scattering amplitudes of shape (nm, nlam, nangles), where
+        nangles is the length of the angle array for which the amplitudes
+        were calculated.
+
+    Notes:
+    ------
+    The conversion factor `factor` is calculated as defined in Kees Dullemonds
+    code `makeopac.py`:
+    > Compute conversion factor from the Sxx matrix elements
+    > from the Bohren & Huffman code to the Zxx matrix elements we
+    > use (such that 2*pi*int_{-1}^{+1}Z11(mu)dmu=kappa_scat).
+    > This includes the factor k^2 (wavenumber squared) to get
+    > the actual cross section in units of cm^2 / ster, and there
+    > is the mass of the grain to get the cross section per gram.
+    """
+    factor = (lam[None, :] / (2 * np.pi))**2 / m[:, None]
+    #
+    # Compute the scattering Mueller matrix elements at each angle
+    #
+    S11 = 0.5 * (np.abs(S2)**2 + np.abs(S1)**2)
+    S12 = 0.5 * (np.abs(S2)**2 - np.abs(S1)**2)
+    S33 = np.real(S2[:] * np.conj(S1[:]))
+    S34 = np.imag(S2[:] * np.conj(S1[:]))
+
+    zscat = np.zeros([len(m), len(lam), S1.shape[-1], 6])
+
+    zscat[..., 0] = S11 * factor[:, :, None]
+    zscat[..., 1] = S12 * factor[:, :, None]
+    zscat[..., 2] = S11 * factor[:, :, None]
+    zscat[..., 3] = S33 * factor[:, :, None]
+    zscat[..., 4] = S34 * factor[:, :, None]
+    zscat[..., 5] = S33 * factor[:, :, None]
+
+    return zscat
+
+
+def make_opacity_dict(lam, k_abs, k_scs, g_sca):
+    """
+    To mimick the behavior of the `makedustopac.py` code by Kees Dullemond:
+    package the opacity information to a dictionary.
+    """
+    package = {
+        'lamcm': lam,
+        'kabs': k_abs,
+        'kscat': k_sca,
+        'gscat': g_sca,
+        'matdens': matdens,
+        'agraincm': agraincm
+        }
+
+    return package
+
+
+def write_radmc3d_scatmat_file(opacity_dict, name, dir='.'):
+    """
+    The RADMC-3D radiative transfer package[1] can perform dust continuum
+    radiative transfer for diagnostic purposes. It is designed for astronomical
+    applications. The code needs the opacities in a particular form. This
+    subroutine writes the opacities out in that form. It will write it to
+    the file dustkapscatmat_<name>.inp.
+
+    Arguments:
+    ----------
+
+
+    References:
+    -----------
+
+    - [1] http://www.ita.uni-heidelberg.de/~dullemond/software/radmc-3d/
+
+    """
+    filename = os.path.join(dir, f'dustkapscatmat_{name}.inp')
+
+    with open(filename, 'w') as f:
+        f.write(f'# Opacity and scattering matrix file for ' + name + '\n')
+        f.write(f'# Please do not forget to cite in your publications theoriginal paper of these optical constant measurements\n')
+        f.write(f'# Made with the DISKLAB package code by Cornelis Dullemond & Til Birnstiel\n')
+        f.write(f'# using the bhmie.py Mie code of Bohren and Huffman (python version by Cornelis Dullemond,')
+        f.write(f'# F90 version by Til Birnstiel, both after the original bhmie.f code by Bruce Draine)\n')
+        f.write(f'# Grain size = {opacity_dict['agraincm']:13.6e} cm\n'
+        f.write(f'# Material density = {opacity_dict['matdens']:6.3f} g/cm^3\n')
+        f.write('1\n')  # Format number
+        f.write(f'{opacity_dict['lamcm'].size:d}\n')
+        f.write(f'{opacity_dict['theta'].size:d}\n')
+        f.write('\n')
+        for i in range(opacity_dict['lamcm'].size):
+            f.write('%13.6e %13.6e %13.6e %13.6e\n' % (opacity_dict['lamcm'][i] * 1e4,
+                                                       opacity_dict['kabs'][i],
+                                                       opacity_dict['kscat'][i],
+                                                       opacity_dict['gscat'][i]))
+        f.write('\n')
+        for j in range(opacity_dict['theta'].size):
+            f.write('%13.6e\n' % (opacity_dict['theta'][j]))
+        f.write('\n')
+        for i in range(opacity_dict['lamcm'].size):
+            for j in range(opacity_dict['theta'].size):
+                f.write('%13.6e %13.6e %13.6e %13.6e %13.6e %13.6e\n' %
+                        (opacity_dict['zscat'][i, j, 0], opacity_dict['zscat'][i, j, 1],
+                         opacity_dict['zscat'][i, j, 2], opacity_dict['zscat'][i, j, 3],
+                         opacity_dict['zscat'][i, j, 4], opacity_dict['zscat'][i, j, 5]))
+        f.write('\n')
 
 
 def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False, ax=None):
