@@ -183,7 +183,7 @@ class diel_const(object):
         """
         Initialization of data and such
         """
-        raise NameError('Abstract class not supposed to be initializable')
+        pass
 
     def nk(self, l):
         """
@@ -220,9 +220,9 @@ class diel_const(object):
 
         return result
 
-    def extrapolate_constants(self, lmin, lmax):
+    def extrapolate_constants_up(self, lmin, lmax, n=10, kind='second'):
         """
-        Extend the data by extrapolation to longer wavelengths. Will start
+        Extend the data by log-extrapolation to longer wavelengths. Will start
         fitting for extrapolation at lmin and then extend the data up to lmax.
         """
         #
@@ -232,32 +232,115 @@ class diel_const(object):
         if self._has_negative_n:
             warnings.warn('Extrapolation for negative n values can cause issues')
 
-        l_ext = np.logspace(np.log10(self._l[-1]), np.log10(lmax), 10)
+        l_ext = np.logspace(np.log10(self._l[-1]), np.log10(lmax), n)[1:]
         from scipy.optimize import curve_fit
 
-        def f(x, a, b, c):
-            return a + b * x + c * x**2
+        if kind == 'constant':
+            n_ext = self._n[-1] * np.ones_like(l_ext)
+            k_ext = self._k[-1] * np.ones_like(l_ext)
 
-        i_min = abs(self._l - lmin).argmin()
-        #
-        # extrapolate n
-        #
-        res = curve_fit(f, np.log10(self._l[i_min:]), np.log10(self._n[i_min:]), [np.log10(self._n[-1]), 1, 0])
-        n_ext = 10.**f(np.log10(l_ext), *res[0])
-        n_new = np.append(self._n, n_ext)
-        #
-        # extrapolate k
-        #
-        res = curve_fit(f, np.log10(self._l[i_min:]), np.log10(self._k[i_min:]), [np.log10(self._k[-1]), 1, 0])
-        k_ext = 10.**f(np.log10(l_ext), *res[0])
-        k_new = np.append(self._k, k_ext)
-        l_new = np.append(self._l, l_ext) # noqa
+        elif kind == 'second':
+            def f(x, a, b, c):
+                return a + b * x + c * x**2
+
+            # starting points
+
+            p0_n = [np.log10(self._n[-1]), 1, 0]
+            p0_k = [np.log10(self._k[-1]), 1, 0]
+
+        elif kind in ['first', 'linear']:
+            def f(x, a, b):
+                return a + b * x
+
+            # starting points
+            p0_n = [np.log10(self._n[-1]), 1]
+            p0_k = [np.log10(self._k[-1]), 1]
+
+        else:
+            raise ValueError('`kind` must be `first` or `second`')
+
+        if kind != 'constant':
+            i_min = abs(self._l - lmin).argmin()
+            #
+            # extrapolate n
+            #
+            res = curve_fit(f, np.log10(self._l[i_min:]), np.log10(self._n[i_min:]), p0_n)
+            n_ext = 10.**f(np.log10(l_ext), *res[0])
+            #
+            # extrapolate k
+            #
+            res = curve_fit(f, np.log10(self._l[i_min:]), np.log10(self._k[i_min:]), p0_k)
+            k_ext = 10.**f(np.log10(l_ext), *res[0])
 
         # update attributes
 
-        self._l = l_new
-        self._n = n_new
-        self._k = k_new
+        self._l = np.append(self._l, l_ext)
+        self._n = np.append(self._n, n_ext)
+        self._k = np.append(self._k, k_ext)
+        self._ll = np.log10(self._l)
+        self._ln = np.log10(self._n)
+        self._lk = np.log10(self._k)
+        self._lmin = self._l.min()
+        self._lmax = self._l.max()
+        self.material_str += ' - extrapolated'
+
+    def extrapolate_constants_down(self, lmin, lmax, n=10, kind='second'):
+        """
+        Extend the data by log-extrapolation to shorter wavelengths. Will start
+        fitting for extrapolation at lmax and then extend the data down to lmin.
+        """
+        #
+        # extrapolate
+        #
+        self.extrapol = True
+        if self._has_negative_n:
+            warnings.warn('Extrapolation for negative n values can cause issues')
+
+        l_ext = np.logspace(np.log10(lmin), np.log10(self._l[0]), n)[:-1]
+        from scipy.optimize import curve_fit
+
+        if kind == 'constant':
+            n_ext = self._n[0] * np.ones_like(l_ext)
+            k_ext = self._k[0] * np.ones_like(l_ext)
+
+        elif kind == 'second':
+            def f(x, a, b, c):
+                return a + b * x + c * x**2
+
+            # starting points
+
+            p0_n = [np.log10(self._n[0]), 0, 0]
+            p0_k = [np.log10(self._k[0]), 0, 0]
+
+        elif kind in ['first', 'linear']:
+            def f(x, a, b):
+                return a + b * x
+
+            # starting points
+            p0_n = [np.log10(self._n[0]), 1]
+            p0_k = [np.log10(self._k[0]), 1]
+
+        else:
+            raise ValueError('`kind` must be `first` or `second`')
+
+        if kind != 'constant':
+            i_max = abs(self._l - lmax).argmin()
+            #
+            # extrapolate n
+            #
+            res = curve_fit(f, np.log10(self._l[:i_max]), np.log10(self._n[:i_max]), p0_n)
+            n_ext = 10.**f(np.log10(l_ext), *res[0])
+            #
+            # extrapolate k
+            #
+            res = curve_fit(f, np.log10(self._l[:i_max]), np.log10(self._k[:i_max]), p0_k)
+            k_ext = 10.**f(np.log10(l_ext), *res[0])
+
+        # update attributes
+
+        self._l = np.append(l_ext, self._l)
+        self._n = np.append(n_ext, self._n)
+        self._k = np.append(k_ext, self._k)
         self._ll = np.log10(self._l)
         self._ln = np.log10(self._n)
         self._lk = np.log10(self._k)
@@ -527,6 +610,13 @@ class diel_vacuum(diel_const):
     Returns the dielectric constants for vacuum
     """
     extrapol = False
+    _lmin = 0
+    _lmax = 1e100
+    _l = np.array(_lmin)
+    _n = np.array([1.0])
+    _k = np.array([0.0])
+    _has_negative_n = True
+    extrapol = False
 
     def __init__(self):
         """
@@ -598,7 +688,7 @@ class diel_zubko_carbon(diel_const):
         self._lmax = self._l.max()
 
         if extrapol:
-            self.extrapolate_constants(lmin, lmax)
+            self.extrapolate_constants_up(lmin, lmax)
 
 
 class diel_warren(diel_const):
@@ -774,7 +864,7 @@ class diel_luca(diel_const):
         self._lmax = self._l.max()
 
 
-class diel_mixed(diel_const):
+class diel_mixed():
     """
     This is a dielectric_constant class that mixes the various
     dielectric constants given their abundances.
@@ -865,6 +955,47 @@ class diel_mixed(diel_const):
             #
             eps_mean = np.sqrt(eps_mean)
             return np.array([eps_mean.real.squeeze(), -eps_mean.imag.squeeze()])
+
+    def get_normal_object(self):
+        """
+        By default, diel_mixed provides only the nk values, when self.nk is
+        called. We can make this object behave like the other optical constants
+        with this function. This will return a diel_const object.
+        """
+        d = diel_const()
+
+        const = self.constants
+
+        d.datafile = ''
+
+        for c in const:
+            d.datafile += c.datafile + '\n'
+
+        lmin = np.max([c._lmin for c in const])
+        lmax = np.min([c._lmax for c in const])
+        lam = np.logspace(np.log10(lmin), np.log10(lmax), 200)
+
+        n = np.zeros_like(lam)
+        k = np.zeros_like(lam)
+
+        for i, _lam in enumerate(lam):
+            n[i], k[i] = self.nk(_lam)
+
+        d.material_str = self.material_str
+        d.extrapol = self.extrapol
+
+        d._l = lam
+        d._n = n
+        d._k = k
+        d._ll = np.log10(lam)
+        d._ln = np.log10(n)
+        d._lk = np.log10(k)
+        d._lmin = lmin
+        d._lmax = lmax
+
+        d._has_negative_n = np.any(d._n <= 0)
+
+        return d
 
 
 def powerlaw_N_of_a(a, a_max, q, rho_s):
@@ -1018,7 +1149,9 @@ def get_size_averaged_opacity(a, lam, n, rho_s, diel_const=None, q_abs=None,
     # calculate the opacities ...
     #
     if (q_abs is None or q_sca is None) and (k_abs is None or k_sca is None):
-        q_abs, q_sca = get_mie_coefficients(a, lam, diel_const)
+        package = get_mie_coefficients(a, lam, diel_const)
+        q_abs = package['q_abs']
+        q_sca = package['q_sca']
     elif (k_abs is None or k_sca is None):
         kappa_abs, kappa_sca = get_kappa_from_q(a, m, q_abs, q_sca)
     #
@@ -1061,16 +1194,21 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function, 
     nang: int
     :    Number of angles for scattering function (not supported by all methods)
 
-    return_all : bool
-    :    wether or not to include also the asymmetry factor or scattering function in the output.
-         If true, the output elements 2 and onwards are gg_sca, s_1, s_2
-
     Output:
     -------
-    q_abs,q_sca : array
+    Dictionary with these entries:
 
-    if return_all is true, the output is
-    q_abs,q_sca, gg_sca, s_1, s_2
+    q_abs,q_sca : array
+        absportion and scattering coefficients
+
+    theta : array
+        angles
+
+    g_sca : array
+        assymetry factor
+
+    S1, S2 : arrays
+        complex scattering amplitudes
     """
     from scipy.optimize import fsolve
     #
@@ -1079,7 +1217,7 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function, 
     #
     q_abs = np.zeros([len(A), len(LAM)])
     q_sca = np.zeros_like(q_abs)
-    gg_sca = np.zeros_like(q_abs)
+    g_sca = np.zeros_like(q_abs)
     s_1 = np.zeros([len(A), len(LAM), nang], dtype=complex)
     s_2 = np.zeros([len(A), len(LAM), nang], dtype=complex)
     NMXX = 200000
@@ -1126,7 +1264,7 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function, 
             S1, S2, Qext, Qabs, Qsca, Qback, gsca = bhmie_function(x, complex(n, k), nang)
             q_abs[ia, ilam] = Qabs
             q_sca[ia, ilam] = Qsca
-            gg_sca[ia, ilam] = gsca.real
+            g_sca[ia, ilam] = gsca.real
             s_1[ia, ilam, :] = S1[:nang]
             s_2[ia, ilam, :] = S2[:nang]
         #
@@ -1134,12 +1272,18 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function, 
         #
         q_abs[ia + 1:, ilam] = q_abs[ia, ilam]
         q_sca[ia + 1:, ilam] = q_sca[ia, ilam]
-        gg_sca[ia + 1:, ilam] = gg_sca[ia, ilam]
+        g_sca[ia + 1:, ilam] = g_sca[ia, ilam]
 
-    if return_all:
-        return q_abs, q_sca, gg_sca, s_1, s_2
-    else:
-        return q_abs, q_sca
+    package = {
+        'q_abs': q_abs,
+        'q_sca': q_sca,
+        'g_sca': g_sca,
+        'S1': s_1,
+        'S2': s_2,
+        'theta': np.linspace(0, 180., nang + 1)
+        }
+
+    return package
 
 
 def calculate_mueller_matrix(lam, m, S1, S2):
@@ -1193,7 +1337,7 @@ def calculate_mueller_matrix(lam, m, S1, S2):
     return zscat
 
 
-def make_opacity_dict(lam, k_abs, k_scs, g_sca):
+def make_opacity_dict(lam, a, k_abs, k_sca, g_sca, rho_s, zscat=None):
     """
     To mimick the behavior of the `makedustopac.py` code by Kees Dullemond:
     package the opacity information to a dictionary.
@@ -1203,14 +1347,15 @@ def make_opacity_dict(lam, k_abs, k_scs, g_sca):
         'kabs': k_abs,
         'kscat': k_sca,
         'gscat': g_sca,
-        'matdens': matdens,
-        'agraincm': agraincm
+        'rho_s': rho_s,
+        'a': a,
+        'zscat': zscat
         }
 
     return package
 
 
-def write_radmc3d_scatmat_file(opacity_dict, name, dir='.'):
+def write_radmc3d_scatmat_file(index, opacity_dict, name, dir='.'):
     """
     The RADMC-3D radiative transfer package[1] can perform dust continuum
     radiative transfer for diagnostic purposes. It is designed for astronomical
@@ -1220,6 +1365,36 @@ def write_radmc3d_scatmat_file(opacity_dict, name, dir='.'):
 
     Arguments:
     ----------
+
+    index : int
+        index of the grain species to be written out
+
+    opacity_dict : dict
+        dictionary with the opacity information. the keys are:
+
+        a : array
+            particle size grid in cm
+
+        lam : array
+            wavelength grid in cm
+
+        theta : array
+            angle grid (degree)
+
+        rho_s : float
+            internal density of the particles
+
+        k_abs, k_sca : array
+            absorption and scattering opacities
+            size = len(a), len(lam)
+
+        g_scat : array
+            Henyey-Greenstein coefficient
+            size = len(a), len(lam)
+
+        zscat : array
+            scattering Mueller matrix elements
+            size = len(a), len(lam), len(theta), 6
 
 
     References:
@@ -1236,27 +1411,27 @@ def write_radmc3d_scatmat_file(opacity_dict, name, dir='.'):
         f.write(f'# Made with the DISKLAB package code by Cornelis Dullemond & Til Birnstiel\n')
         f.write(f'# using the bhmie.py Mie code of Bohren and Huffman (python version by Cornelis Dullemond,')
         f.write(f'# F90 version by Til Birnstiel, both after the original bhmie.f code by Bruce Draine)\n')
-        f.write(f'# Grain size = {opacity_dict['agraincm']:13.6e} cm\n'
-        f.write(f'# Material density = {opacity_dict['matdens']:6.3f} g/cm^3\n')
+        f.write(f'# Grain size = {opacity_dict["a"]:13.6e} cm\n')
+        f.write(f'# Material density = {opacity_dict["rho_s"]:6.3f} g/cm^3\n')
         f.write('1\n')  # Format number
-        f.write(f'{opacity_dict['lamcm'].size:d}\n')
-        f.write(f'{opacity_dict['theta'].size:d}\n')
+        f.write(f'{opacity_dict["lam"].size:d}\n')
+        f.write(f'{opacity_dict["theta"].size:d}\n')
         f.write('\n')
-        for i in range(opacity_dict['lamcm'].size):
-            f.write('%13.6e %13.6e %13.6e %13.6e\n' % (opacity_dict['lamcm'][i] * 1e4,
-                                                       opacity_dict['kabs'][i],
-                                                       opacity_dict['kscat'][i],
-                                                       opacity_dict['gscat'][i]))
+        for i in range(opacity_dict['lam'].size):
+            f.write('%13.6e %13.6e %13.6e %13.6e\n' % (opacity_dict['lam'][i] * 1e4,
+                                                       opacity_dict['k_abs'][i],
+                                                       opacity_dict['k_scat'][i],
+                                                       opacity_dict['g_scat'][i]))
         f.write('\n')
         for j in range(opacity_dict['theta'].size):
             f.write('%13.6e\n' % (opacity_dict['theta'][j]))
         f.write('\n')
-        for i in range(opacity_dict['lamcm'].size):
-            for j in range(opacity_dict['theta'].size):
+        for ilam in range(opacity_dict['lam'].size):
+            for itheta in range(opacity_dict['theta'].size):
                 f.write('%13.6e %13.6e %13.6e %13.6e %13.6e %13.6e\n' %
-                        (opacity_dict['zscat'][i, j, 0], opacity_dict['zscat'][i, j, 1],
-                         opacity_dict['zscat'][i, j, 2], opacity_dict['zscat'][i, j, 3],
-                         opacity_dict['zscat'][i, j, 4], opacity_dict['zscat'][i, j, 5]))
+                        (opacity_dict['zscat'][ilam, itheta, 0], opacity_dict['zscat'][ilam, itheta, 1],
+                         opacity_dict['zscat'][ilam, itheta, 2], opacity_dict['zscat'][ilam, itheta, 3],
+                         opacity_dict['zscat'][ilam, itheta, 4], opacity_dict['zscat'][ilam, itheta, 5]))
         f.write('\n')
 
 
@@ -1399,23 +1574,25 @@ def get_opacities(a, lam, rho_s=None, diel_const=None, bhmie_function=bhmie_func
     bhmie_function : callable
         which function to use for the mie calculation
 
-    return_all : bool
-        default False: return just kappa_abs, kappa_sca, rho_s
-        True: return kappa_*, assymetry factor, S1, S2, and rho_s
-
     extrapol : bool
-        whether to extrapolate default optical constants if lam is outside the
+        whether to extrapolate *default* optical constants if lam is outside the
         wavelength range of the data
 
     Output:
     -------
+    Returns a dictionary with the following entries:
+
     kappa_abs, kappa_sca : arrays
         absorption and scattering opacities [g/cm^2]
 
-    gg_sca : array
+    theta : array
+        angle (in degree, 0=forward) on which angle dependent quantities are defined
 
-    s_1, s_2 : arrays
-        the Mueller matrix elements
+    g_sca : array
+        Henyey-Greenstein scattering asymmetry factor
+
+    S1, S2 : arrays
+        the complex scattering amplitudes
 
     rho_s : float
         material density of the grains [g/cm^3]
@@ -1431,11 +1608,15 @@ def get_opacities(a, lam, rho_s=None, diel_const=None, bhmie_function=bhmie_func
 
     m = 4 * np.pi / 3. * rho_s * a**3
 
-    q_abs, q_sca, gg_sca, s_1, s_2 = get_mie_coefficients(a, lam, diel_const, return_all=True, bhmie_function=bhmie_function)
+    package = get_mie_coefficients(a, lam, diel_const, return_all=True, bhmie_function=bhmie_function)
+
+    q_abs = package['q_abs']
+    q_sca = package['q_sca']
 
     kappa_abs, kappa_sca = get_kappa_from_q(a, m, q_abs, q_sca)
 
-    if return_all:
-        return kappa_abs, kappa_sca, gg_sca, s_1, s_2, rho_s
-    else:
-        return kappa_abs, kappa_sca, rho_s
+    package['rho_s'] = rho_s
+    package['k_abs'] = kappa_abs
+    package['k_sca'] = kappa_sca
+
+    return package
