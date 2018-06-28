@@ -31,7 +31,8 @@ except ImportError:
             complex ref. index = n + i * k, e.g. `complex(1.,0.)`
 
         nangles : int
-            number of angles between 0 and 180 degree for which to return S1 & S2
+            number of angles between 0 and 90 degree. Will return S1 & S2 at
+            2 * nangles - 1 angles between 0 and 180 degree.
 
         Output:
         -------
@@ -46,7 +47,7 @@ except ImportError:
         gsca : float
             Henyey-Greenstein asymmetry factor
         """
-        theta = np.linspace(0., 180., nangles + 1)
+        theta = np.linspace(0., 180., 2 * nangles - 1)
         return _bhmie_p(x, nk, theta)
 
 try:
@@ -63,7 +64,8 @@ try:
             complex ref. index = n + i * k, e.g. `complex(1.,0.)`
 
         nangles : int
-            number of angles between 0 and 180 degree for which to return S1 & S2
+            number of angles between 0 and 90 degree. Will return S1 & S2 at
+            2 * nangles - 1 angles between 0 and 180 degree.
 
         Output:
         -------
@@ -88,10 +90,10 @@ try:
         Qback = opac.qratio()
         gsca = opac.asy()
 
-        S1 = np.zeros(n_angles + 1, dtype=complex)
-        S2 = np.zeros(n_angles + 1, dtype=complex)
+        S1 = np.zeros(2 * n_angles - 1, dtype=complex)
+        S2 = np.zeros(2 * n_angles - 1, dtype=complex)
 
-        angles = np.linspace(0., 180., n_angles + 1)
+        angles = np.linspace(0., 180., 2 * n_angles - 1)
 
         for i, angle in enumerate(angles):
             S1[i], S2[i] = opac.S12(np.cos(angle / 180 * np.pi))
@@ -179,11 +181,25 @@ class diel_const(object):
     extrapol = False
     _has_negative_n = False
 
-    def __init__(self):
+    def __init__(self, lam, n, k):
         """
         Initialization of data and such
         """
-        pass
+        if np.isscalar(lam):
+            h = 1e-10 * lam
+            lam = np.array([lam - h, lam + h])
+            n = np.ones_like(lam) * n
+            k = np.ones_like(lam) * k
+
+        self._l = lam
+        self._n = n
+        self._k = k
+        self._ll = np.log10(lam)
+        self._ln = np.log10(n)
+        self._lk = np.log10(k)
+        self._lmin = lam[0]
+        self._lmax = lam[-1]
+        self._has_negative_n = np.any(n <= 0)
 
     def nk(self, l):
         """
@@ -1176,23 +1192,24 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function, 
     Arguments:
     ----------
     A : array
-    : all the grain sizes for which the opacities are calculated
+        all the grain sizes for which the opacities are calculated
 
     LAM : array
-    :    all the wavelength in cm at which the opacities are calculated
+        all the wavelength in cm at which the opacities are calculated
 
     diel_constants : object of class diel_const
-    :    the dielectric constants that are used for the calculation
+        the dielectric constants that are used for the calculation
 
     Keywords:
     ---------
 
-    method: callable
-    : a function that carries out the Mie calculation with this signature
+    method : callable
+        a function that carries out the Mie calculation with this signature
         S1, S2, Qext, Qabs, Qsca, Qback, gsca = bhmie_function(x, (n, k), n_angles)
 
-    nang: int
-    :    Number of angles for scattering function (not supported by all methods)
+    nang : int
+        number of angles between 0 and 90 degree. Will return S1 & S2 at
+        2 * nang - 1 angles between 0 and 180 degree.
 
     Output:
     -------
@@ -1218,9 +1235,9 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function, 
     q_abs = np.zeros([len(A), len(LAM)])
     q_sca = np.zeros_like(q_abs)
     g_sca = np.zeros_like(q_abs)
-    s_1 = np.zeros([len(A), len(LAM), nang], dtype=complex)
-    s_2 = np.zeros([len(A), len(LAM), nang], dtype=complex)
-    NMXX = 200000
+    s_1 = np.zeros([len(A), len(LAM), 2 * nang - 1], dtype=complex)
+    s_2 = np.zeros([len(A), len(LAM), 2 * nang - 1], dtype=complex)
+    NMXX = 200000  # after now many terms to use extrapolation
     full_mask = np.zeros_like(q_abs)
     #
     # the wave length loop
@@ -1265,8 +1282,8 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function, 
             q_abs[ia, ilam] = Qabs
             q_sca[ia, ilam] = Qsca
             g_sca[ia, ilam] = gsca.real
-            s_1[ia, ilam, :] = S1[:nang]
-            s_2[ia, ilam, :] = S2[:nang]
+            s_1[ia, ilam, :] = S1
+            s_2[ia, ilam, :] = S2
         #
         # extrapolate for large grains
         #
@@ -1280,7 +1297,7 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function, 
         'g_sca': g_sca,
         'S1': s_1,
         'S2': s_2,
-        'theta': np.linspace(0, 180., nang + 1)
+        'theta': np.linspace(0, 180., 2 * nang - 1)
         }
 
     return package
@@ -1547,7 +1564,7 @@ def get_default_diel_constants(extrapol=False, lmax=None):
 
 
 def get_opacities(a, lam, rho_s=None, diel_const=None, bhmie_function=bhmie_function,
-                  return_all=False, extrapol=False):
+                  return_all=False, extrapol=False, n_angle=3):
     """
     Calculates opacities according to some specified method for
     a given size- and wavelength grid. If diel_const and rho_s is not given,
@@ -1577,6 +1594,9 @@ def get_opacities(a, lam, rho_s=None, diel_const=None, bhmie_function=bhmie_func
     extrapol : bool
         whether to extrapolate *default* optical constants if lam is outside the
         wavelength range of the data
+
+    n_angle : int
+        number of angles for which to calculate scattering properties
 
     Output:
     -------
@@ -1608,7 +1628,7 @@ def get_opacities(a, lam, rho_s=None, diel_const=None, bhmie_function=bhmie_func
 
     m = 4 * np.pi / 3. * rho_s * a**3
 
-    package = get_mie_coefficients(a, lam, diel_const, return_all=True, bhmie_function=bhmie_function)
+    package = get_mie_coefficients(a, lam, diel_const, return_all=True, bhmie_function=bhmie_function, nang=n_angle)
 
     q_abs = package['q_abs']
     q_sca = package['q_sca']
