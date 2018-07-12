@@ -11,44 +11,30 @@ import sys
 import warnings
 import pkg_resources
 
+# next we need to define the bhmie function. By default we try to use the
+# fortran version which should be the fastest. Otherwise, we use a python
+# version. If numba is installed, it will be used. To check what your
+# installation uses, print out bhmie_type, which will be in decending speed
+# fortran, numba, python. Another python implementation can also be used
+# which is available via the wrapper bhmie_pymiecoated. To force the code to
+# use another version than the (faster) one used by default is by calling
+# the methods with the keyword
+# `bhmie_function = `
+# - `bhmie_fortran`
+# - `bhmie_python_wrapper`
+# - `bhmie_pymiecoated`
+
 try:
-    from .bhmie_fortran import bhmie_fortran as bhmie_function
+    from .bhmie_fortran import bhmie_fortran
+    bhmie_function = bhmie_fortran
+    bhmie_type = 'fortran'
+
 except ImportError:
     warnings.warn('could not import compiled mie code - mie calculation will be slow')
-    from .bhmie_python import _bhmie_p
-
-    def bhmie_function(x, nk, nangles):
-        """
-        wrapper for the python version to be callable just like the fortran version.
-
-        Arguments:
-        ----------
-
-        x : float
-            size parameter 2 pi a / lambda
-
-        nk : complex
-            complex ref. index = n + i * k, e.g. `complex(1.,0.)`
-
-        nangles : int
-            number of angles between 0 and 90 degree. Will return S1 & S2 at
-            2 * nangles - 1 angles between 0 and 180 degree.
-
-        Output:
-        -------
-        S1, S2, Qext, Qabs, Qsca, Qback, gsca
-
-        S1, S2 : arrays
-            the matrix elements as function of angle
-
-        Qext, Qabs, Qsca, Qback : float
-            the extinction, absorption, scattering, backscattering coefficients
-
-        gsca : float
-            Henyey-Greenstein asymmetry factor
-        """
-        theta = np.linspace(0., 180., 2 * nangles - 1)
-        return _bhmie_p(x, nk, theta)
+    from .bhmie_python import bhmie_python_wrapper
+    from .bhmie_python import bhmie_type as bt
+    bhmie_type = bt
+    bhmie_function = bhmie_python_wrapper
 
 try:
     import pymiecoated
@@ -151,7 +137,7 @@ def download(packagedir):
 
             filename = link.split('/')[-1]
 
-            print(f'material: {material}, downloading {filename}: ... ', end='')
+            print('material: {}, downloading {}: ... '.format(material,filename)) # , end='')
             try:
                 urlretrieve(link, filename=os.path.join(packagedir, filename))
                 print('Done!')
@@ -601,11 +587,11 @@ class diel_dl84_astrosil(diel_const):
         self.material_str = 'Astronomical Silicates (Draine & Lee 1984)'
         self.datafile = pkg_resources.resource_filename(
             __name__, os.path.join('optical_constants', 'draine', 'eps_Sil'))
-        f = open(self.datafile)
         if not os.path.isfile(self.datafile):
             download(os.path.dirname(self.datafile))
-        self.headerinfo = [f.readline() for i in range(6)]
-        data = np.loadtxt(f)
+        with open(self.datafile) as f:
+            self.headerinfo = [f.readline() for i in range(6)]
+            data = np.loadtxt(f)
         #
         # assign wavelength and optical constants
         #
@@ -685,11 +671,11 @@ class diel_zubko_carbon(diel_const):
         self.datafile = directory
 
         E = np.loadtxt(pkg_resources.resource_filename(
-            __name__, os.path.join(self.datafile, f'zubko_E_{sample}.txt')))[-1::-1]
+            __name__, os.path.join(self.datafile, 'zubko_E_{}.txt'.format(sample))))[-1::-1]
         n = np.loadtxt(pkg_resources.resource_filename(
-            __name__, os.path.join(self.datafile, f'zubko_n_{sample}.txt')))[-1::-1]
+            __name__, os.path.join(self.datafile, 'zubko_n_{}.txt'.format(sample))))[-1::-1]
         k = np.loadtxt(pkg_resources.resource_filename(
-            __name__, os.path.join(self.datafile, f'zubko_k_{sample}.txt')))[-1::-1]
+            __name__, os.path.join(self.datafile, 'zubko_k_{}.txt'.format(sample))))[-1::-1]
         l = 0.00012398419292004205 / E  # E = h*c/lambda in CGS # noqa
         #
         # assign wavelength and optical constants
@@ -1184,7 +1170,8 @@ def get_size_averaged_opacity(a, lam, n, rho_s, diel_const=None, q_abs=None,
     return kappa_abs_m, kappa_sca_m
 
 
-def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function, nang=3, return_all=False):
+def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function,
+                         nang=3, return_all=False, extrapolate_large_grains=False):
     """
     This calculates the opacity for the given dielectric constants for all
     grain sizes and wavelength specified in LAM and A.
@@ -1210,6 +1197,10 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function, 
     nang : int
         number of angles between 0 and 90 degree. Will return S1 & S2 at
         2 * nang - 1 angles between 0 and 180 degree.
+
+    extrapolate_large_grains : bool
+        default: False; if True, then extrapolate the absorption and scattering
+        coefficients for very large grains.
 
     Output:
     -------
@@ -1237,7 +1228,7 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function, 
     g_sca = np.zeros_like(q_abs)
     s_1 = np.zeros([len(A), len(LAM), 2 * nang - 1], dtype=complex)
     s_2 = np.zeros([len(A), len(LAM), 2 * nang - 1], dtype=complex)
-    NMXX = 200000  # after now many terms to use extrapolation
+    NMXX = 200000  # after how many terms to use extrapolation
     full_mask = np.zeros_like(q_abs)
     #
     # the wave length loop
@@ -1257,16 +1248,20 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function, 
         X = 2. * np.pi / lam * A
         #
         # define the cutoff where no convergence is reached
+        # mask is true where the calculation should converge
         #
         Y = X * (n + k * 1j)
         Y = abs(Y)
         Xstop = X + 4. * X**.333333 + 2.0
         nmx = np.maximum(Xstop, Y).astype(int) + 15
         mask = nmx < NMXX
+        if extrapolate_large_grains is False:
+            mask[:] = True
         full_mask[:, ilam] = mask
         #
         # cut it such that only converging terms are included
-        # and extrapolate the missing parts (see below)
+        # and extrapolate the missing parts (see below).
+        # X_cut are the ones that should be calculated normally
         #
         X_cut = X[mask]
         if len(X_cut) == 0:
@@ -1420,19 +1415,19 @@ def write_radmc3d_scatmat_file(index, opacity_dict, name, dir='.'):
     - [1] http://www.ita.uni-heidelberg.de/~dullemond/software/radmc-3d/
 
     """
-    filename = os.path.join(dir, f'dustkapscatmat_{name}.inp')
+    filename = os.path.join(dir, 'dustkapscatmat_{}.inp'.format(name))
 
     with open(filename, 'w') as f:
-        f.write(f'# Opacity and scattering matrix file for ' + name + '\n')
-        f.write(f'# Please do not forget to cite in your publications theoriginal paper of these optical constant measurements\n')
-        f.write(f'# Made with the DISKLAB package code by Cornelis Dullemond & Til Birnstiel\n')
-        f.write(f'# using the bhmie.py Mie code of Bohren and Huffman (python version by Cornelis Dullemond,')
-        f.write(f'# F90 version by Til Birnstiel, both after the original bhmie.f code by Bruce Draine)\n')
-        f.write(f'# Grain size = {opacity_dict["a"]:13.6e} cm\n')
-        f.write(f'# Material density = {opacity_dict["rho_s"]:6.3f} g/cm^3\n')
+        f.write('# Opacity and scattering matrix file for ' + name + '\n')
+        f.write('# Please do not forget to cite in your publications theoriginal paper of these optical constant measurements\n')
+        f.write('# Made with the DISKLAB package code by Cornelis Dullemond & Til Birnstiel\n')
+        f.write('# using the bhmie.py Mie code of Bohren and Huffman (python version by Cornelis Dullemond,')
+        f.write('# F90 version by Til Birnstiel, both after the original bhmie.f code by Bruce Draine)\n')
+        f.write('# Grain size = {0:13.6e} cm\n'.format(opacity_dict["a"]))
+        f.write('# Material density = {0:6.3f} g/cm^3\n'.format(opacity_dict["rho_s"]))
         f.write('1\n')  # Format number
-        f.write(f'{opacity_dict["lam"].size:d}\n')
-        f.write(f'{opacity_dict["theta"].size:d}\n')
+        f.write('{0:d}\n'.format(opacity_dict["lam"].size))
+        f.write('{0:d}\n'.format(opacity_dict["theta"].size))
         f.write('\n')
         for i in range(opacity_dict['lam'].size):
             f.write('%13.6e %13.6e %13.6e %13.6e\n' % (opacity_dict['lam'][i] * 1e4,
@@ -1504,9 +1499,9 @@ def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False, ax=None):
                     nk[i] = np.nan
 
         mask = np.invert(np.isnan(nk[:, 0]))
-        ax.loglog(lam[mask], nk[:, 0][mask], label='$n_1$ - {}'.format(c.material_str), c=f'C{n}', alpha=0.7, ls='-')
+        ax.loglog(lam[mask], nk[:, 0][mask], label='$n_1$ - {}'.format(c.material_str), c='C{}'.format(n), alpha=0.7, ls='-')
         mask = np.invert(np.isnan(nk[:, 1]))
-        ax.loglog(lam[mask], nk[:, 1][mask], label='$k_1$ - {}'.format(c.material_str), c=f'C{n}', alpha=0.7, ls='--')
+        ax.loglog(lam[mask], nk[:, 1][mask], label='$k_1$ - {}'.format(c.material_str), c='C{}'.format(n), alpha=0.7, ls='--')
 
     ax.set_xlabel('wavelength [cm]')
     ax.set_ylabel('$n, k$')
@@ -1564,7 +1559,8 @@ def get_default_diel_constants(extrapol=False, lmax=None):
 
 
 def get_opacities(a, lam, rho_s=None, diel_const=None, bhmie_function=bhmie_function,
-                  return_all=False, extrapol=False, n_angle=3):
+                  return_all=False, extrapol=False, n_angle=3,
+                  extrapolate_large_grains=False):
     """
     Calculates opacities according to some specified method for
     a given size- and wavelength grid. If diel_const and rho_s is not given,
@@ -1598,6 +1594,9 @@ def get_opacities(a, lam, rho_s=None, diel_const=None, bhmie_function=bhmie_func
     n_angle : int
         number of angles for which to calculate scattering properties
 
+    extrapolate_large_grains : bool
+        option passed to get_mie_cofefficients, see there.
+
     Output:
     -------
     Returns a dictionary with the following entries:
@@ -1628,7 +1627,10 @@ def get_opacities(a, lam, rho_s=None, diel_const=None, bhmie_function=bhmie_func
 
     m = 4 * np.pi / 3. * rho_s * a**3
 
-    package = get_mie_coefficients(a, lam, diel_const, return_all=True, bhmie_function=bhmie_function, nang=n_angle)
+    package = get_mie_coefficients(
+        a, lam, diel_const, return_all=True,
+        bhmie_function=bhmie_function, nang=n_angle,
+        extrapolate_large_grains=extrapolate_large_grains)
 
     q_abs = package['q_abs']
     q_sca = package['q_sca']

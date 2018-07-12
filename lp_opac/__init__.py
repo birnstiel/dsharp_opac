@@ -1,5 +1,8 @@
 from .bhmie_python import bhmie_python
-from .bhmie_fortran import bhmie_fortran
+try:
+    from .bhmie_fortran import bhmie_fortran
+except ImportError:
+    print('fortran mie routines unavailable')
 
 from .lp_opac import \
     progress_bar, \
@@ -21,7 +24,8 @@ from .lp_opac import \
     get_mie_coefficients, \
     compare_nk, \
     get_default_diel_constants, \
-    get_opacities
+    get_opacities, \
+    calculate_mueller_matrix
 
 __all__ = [
     'bhmie_python',
@@ -45,5 +49,6 @@ __all__ = [
     'get_mie_coefficients',
     'compare_nk',
     'get_default_diel_constants',
-    'get_opacities'
+    'get_opacities',
+    'calculate_mueller_matrix'
     ]

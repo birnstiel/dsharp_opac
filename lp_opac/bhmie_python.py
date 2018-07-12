@@ -2,11 +2,14 @@ import numpy as np
 import warnings
 try:
     from numba import njit
+    bhmie_type = 'numba'
 except ImportError:
     warnings.warn('numba not available, opacity calculation will be very slow')
 
     def njit(ob):
         return ob
+
+    bhmie_type = 'python'
 
 
 @njit
@@ -173,3 +176,37 @@ def bhmie_python(x, refrel, theta):
     # Return results
     #
     return S1, S2, Qext, Qabs, Qsca, Qback, gsca.real
+
+
+def bhmie_python_wrapper(x, nk, nangles):
+    """
+    wrapper for the python version to be callable just like the fortran version.
+
+    Arguments:
+    ----------
+
+    x : float
+        size parameter 2 pi a / lambda
+
+    nk : complex
+        complex ref. index = n + i * k, e.g. `complex(1.,0.)`
+
+    nangles : int
+        number of angles between 0 and 90 degree. Will return S1 & S2 at
+        2 * nangles - 1 angles between 0 and 180 degree.
+
+    Output:
+    -------
+    S1, S2, Qext, Qabs, Qsca, Qback, gsca
+
+    S1, S2 : arrays
+        the matrix elements as function of angle
+
+    Qext, Qabs, Qsca, Qback : float
+        the extinction, absorption, scattering, backscattering coefficients
+
+    gsca : float
+        Henyey-Greenstein asymmetry factor
+    """
+    theta = np.linspace(0., 180., 2 * nangles - 1)
+    return bhmie_python(x, nk, theta)
