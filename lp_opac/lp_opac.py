@@ -596,8 +596,8 @@ class diel_dl84_astrosil(diel_const):
         # assign wavelength and optical constants
         #
         self._l = data[::-1, 0] * 1e-4
-        self._n = data[::-1, 1] + 1.
-        self._k = data[::-1, 2]
+        self._n = data[::-1, 3] + 1.
+        self._k = data[::-1, 4]
         if any(self._n <= 0):
             self._has_negative_n = True
         self._ll = np.log10(self._l)
@@ -1230,6 +1230,14 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function,
     s_2 = np.zeros([len(A), len(LAM), 2 * nang - 1], dtype=complex)
     NMXX = 200000  # after how many terms to use extrapolation
     full_mask = np.zeros_like(q_abs)
+
+    # issue a warning for large size parameters
+
+    xmax = 2. * np.pi / LAM.min() * A.max()
+    xstop = xmax + 4. * xmax**.333333 + 2.0
+    nmx = (xstop.max() + 15).max()
+    if nmx > 2e5 and extrapolate_large_grains is False:
+        warnings.warn('large size parameter: nmx={} - this can take long'.format(nmx))
     #
     # the wave length loop
     #
