@@ -25,7 +25,8 @@ from .lp_opac import \
     compare_nk, \
     get_default_diel_constants, \
     get_opacities, \
-    calculate_mueller_matrix
+    calculate_mueller_matrix, \
+    size_average_opacity
 
 __all__ = [
     'bhmie_python',
@@ -50,5 +51,6 @@ __all__ = [
     'compare_nk',
     'get_default_diel_constants',
     'get_opacities',
-    'calculate_mueller_matrix'
+    'calculate_mueller_matrix',
+    'size_average_opacity'
     ]

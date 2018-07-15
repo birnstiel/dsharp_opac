@@ -1650,3 +1650,77 @@ def get_opacities(a, lam, rho_s=None, diel_const=None, bhmie_function=bhmie_func
     package['k_sca'] = kappa_sca
 
     return package
+
+
+def size_average_opacity(lam_avg, a, lam, k_abs, k_sca, q=3.5, plot=False, ax=None):
+    """
+    Calculates the opacity as function of maximum particle size for a power-law size distribution
+
+    Arguments:
+    ----------
+    lam_avg : float
+        wavelength at which to calculate the size-averaged opacities
+
+    a : array
+        particle size array [cm]
+
+    lam : array
+        wavelength array [cm]
+
+    k_abs, k_sca: arrays
+        absoprtion and scattering opacitity [cm^2/g]
+
+    Keywords:
+    ---------
+
+    q : float
+        power-law index of the size distribution, n(a) \propto a^{-q}
+
+    plot : bool
+        if True, create a plot of the result
+
+    ax : None | axes object
+        if None: plot is created in new figure, if axes object: uses this object
+        for the plotting.
+
+    Output:
+    -------
+    k_abs, k_sca, [ax]
+
+    k_abs, k_sca : arrays
+        size averaged opacities as function of maximum particle size
+
+    ax : axes object
+        if plot is True: return the axes object
+    """
+    import matplotlib.pyplot as plt
+
+    # interpolate at the observed frequencies
+
+    k_a = np.array([np.interp(lam_avg, lam, k_abs[ia, :]) for ia in range(len(a))])
+    k_s = np.array([np.interp(lam_avg, lam, k_sca[ia, :]) for ia in range(len(a))])
+
+    # average over size distributions
+
+    ka = np.zeros_like(a)
+    ks = np.zeros_like(a)
+    for ia in range(len(a)):
+        s = (a / a[0])**(4 - q)
+        if ia < len(a) - 1:
+            s[ia + 1:] = 1e-100
+        s = s / s.sum()
+        ka[ia] = np.sum(k_a * s)
+        ks[ia] = np.sum(k_s * s)
+    if plot:
+        if ax is None:
+            f, ax = plt.subplots()
+        ax.loglog(a, ka, '-', label='absorption, $\lambda = {:2.2g}$ mm'.format(lam_avg * 10))
+        ax.loglog(a, ks, '--', label='scattering, $\lambda = {:2.2g}$ mm'.format(lam_avg * 10))
+        ax.set_xlabel('$a_\mathrm{max}$ [cm]')
+        ax.set_ylabel('$\kappa$ [cm$^2$/g]')
+        ax.set_xlim(1e-4, 1e2)
+        ax.set_ylim(0.01, 50)
+        ax.legend()
+        return ka, ks, ax
+    else:
+        return ka, ks
