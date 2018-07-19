@@ -137,7 +137,7 @@ def download(packagedir):
 
             filename = link.split('/')[-1]
 
-            print('material: {}, downloading {}: ... '.format(material,filename)) # , end='')
+            print('material: {}, downloading {}: ... '.format(material, filename), end='')
             try:
                 urlretrieve(link, filename=os.path.join(packagedir, filename))
                 print('Done!')
@@ -166,6 +166,7 @@ class diel_const(object):
     _lmax = None
     extrapol = False
     _has_negative_n = False
+    rho = None
 
     def __init__(self, lam, n, k):
         """
@@ -424,7 +425,7 @@ class diel_henning(diel_const):
 
     """
 
-    def __init__(self, species, iron_abundance='normal', new=True):
+    def __init__(self, species, refractory=False, iron_abundance='normal', new=True):
         """
         Overwrite the initialization of the parent class
         """
@@ -448,7 +449,7 @@ class diel_henning(diel_const):
             if iron_abundance == 'normal':
                 fname = new * 'olmg70k' + (not new) * 'olivine'
             elif iron_abundance == 'low':
-                fname = 'olivine100k'
+                fname = 'olivinenewk'
             elif iron_abundance == 'high':
                 fname = 'olmg60k'
         elif species == 'orthopyroxene':
@@ -459,6 +460,26 @@ class diel_henning(diel_const):
             elif iron_abundance == 'high':
                 fname = 'pyrmg60k'
 
+        densities = {
+            'olmg70k': 3.49,
+            'olivine': 3.49,
+            'olivinenewk': 3.20,
+            'olmg60k': 3.59,
+            'orthopyr': 3.40,
+            'pyrmg100k': 3.20,
+            'pyrmg60k': 3.42,
+            'orthopyr': 3.40,
+            'pyrmg70k': 3.40,
+            'ironk': 7.87,
+            'iron': 7.87,
+            'organicsk': 1.5 * refractory + 1.0 * (not refractory),
+            'organics': 1.5 * refractory + 1.0 * (not refractory),
+            'troilitek': 4.83,
+            'troilite': 4.83,
+            'watericek': 0.92,
+            'waterice': 0.92
+            }
+        self.rho = densities[fname]
         self.datafile = pkg_resources.resource_filename(__name__, os.path.join(
             'optical_constants', 'henning', 'new' * new + 'old' * (not new), fname + '.lnk'))
         if not os.path.isfile(self.datafile):
@@ -486,34 +507,185 @@ class diel_henning(diel_const):
             download(path)
 
 
-class diel_draine2003_astrosil(diel_const):
+class diel_jaeger98(diel_const):
     """
-    Returns the dielectric constants for astronomical silicates from
-    Draine 2003 [1]. The data comes from callindex.out_sil.D03`
-    which was downloaded from
+    Returns the dielectric constants for the various carbonaceous dust optical
+    constants from:
 
-        ftp://ftp.astro.princeton.edu/draine/dust/diel/callindex.out_silD03
+    [Jäger et al. 1998](http://adsabs.harvard.edu/abs/1998A%26A...332..291J)
 
-    on 2014-01-21--17:16 EDT
+    Densities are given as:
 
-    Reference: [1] https://dx.doi.org/10.1086/379123
+    | T [degree C] | 400   | 600   | 800   | 1000  |
+    |:-------------|:------|:------|:------|:------|
+    | rho [g/cm^3] | 1.435 | 1.670 | 1.843 | 1.988 |
+
+    Arguments:
+    ----------
+
+    T : str
+        temperature in celsius, can be [400, 600, 800, 1000]
     """
 
-    def __init__(self):
+    def __init__(self, T):
         """
         Overwrite the initialization of the parent class
         """
         #
-        # open file, read header and data
+        # set the path and do some safety checks
         #
-        self.material_str = 'Astronomical Silicates (Draine 2003)'
+        temps = [400, 600, 800, 1000]
+        rhos  = [1.435, 1.670, 1.843, 1.988]
+        assert T in temps, "invalid temperature, use {}".format(temps)
+        self.material_str = 'Carbonaceous dust, T={} C (Jäger et al. 1998)'.format(T)
+        self.rho = rhos[temps.index(T)]
+
+        fname = 'cel{}.lnk'.format(T)
         self.datafile = pkg_resources.resource_filename(__name__, os.path.join(
-            'optical_constants', 'draine', 'callindex.out_silD03'))
+            'optical_constants', 'jaeger', fname))
         if not os.path.isfile(self.datafile):
             download(os.path.dirname(self.datafile))
-        f = open(self.datafile)
-        self.headerinfo = [f.readline() for i in range(5)]
-        data = np.loadtxt(f)
+        #
+        # read data
+        #
+        print('Reading opacities from %s' % fname)
+        data = np.loadtxt(self.datafile)
+        #
+        # assign wavelength and optical constants
+        #
+        self._l = data[::-1, 0] * 1e-4
+        self._n = data[::-1, 1]
+        self._k = data[::-1, 2]
+        self._ll = np.log10(self._l)
+        self._ln = np.log10(self._n)
+        self._lk = np.log10(self._k)
+        self._lmin = self._l.min()
+        self._lmax = self._l.max()
+
+
+class diel_preibisch93(diel_const):
+    """
+    Returns the dielectric constants for the materials discussed in
+
+    [Preibisch et al. 1993](http://adsabs.harvard.edu/abs/1993A%26A...279..577P)
+
+    And available from
+
+        https://hera.ph1.uni-koeln.de/~ossk/Jena/tables/acneu.lnk
+        https://hera.ph1.uni-koeln.de/~ossk/Jena/tables/diiceneu.lnk
+
+    Arguments:
+    ----------
+
+    species : str
+        which species to use, can be 'dirty ice', 'amorphous carbon'
+    """
+
+    def __init__(self, species):
+        """
+        Overwrite the initialization of the parent class
+        """
+        #
+        # set the path and do some safety checks
+        #
+        species = species.lower()
+        options = ['dirty ice', 'amorphous carbon']
+        assert species in options, "unknown species, use one of {}".format(options)
+        self.material_str = '{}, (Preibisch et al. 1993)'.format(species.capitalize())
+
+        if species == 'dirty ice':
+            fname = 'diiceneu.lnk'
+        elif species == 'amorphous carbon':
+            fname = 'acneu.lnk'
+
+        self.datafile = pkg_resources.resource_filename(__name__, os.path.join(
+            'optical_constants', 'preibisch', fname))
+        if not os.path.isfile(self.datafile):
+            download(os.path.dirname(self.datafile))
+        #
+        # read data
+        #
+        print('Reading opacities from %s' % fname)
+        data = np.loadtxt(self.datafile)
+        #
+        # assign wavelength and optical constants
+        #
+        self._l = data[:, 0]
+        self._n = data[:, 1]
+        self._k = data[:, 2]
+        self._ll = np.log10(self._l)
+        self._ln = np.log10(self._n)
+        self._lk = np.log10(self._k)
+        self._lmin = self._l.min()
+        self._lmax = self._l.max()
+
+
+class diel_draine2003(diel_const):
+    """
+    Returns the dielectric constants from [Draine 2003](https://dx.doi.org/10.1086/379123) for:
+
+    - astronomical silicates (rho = 3.3 g/cc) from
+
+        ftp://ftp.astro.princeton.edu/draine/dust/diel/callindex.out_silD03
+
+    - graphite (rho=2.26 g/cc) from
+
+        ftp://ftp.astro.princeton.edu/draine/dust/diel/callindex.out_CpaD03_0.01
+        ftp://ftp.astro.princeton.edu/draine/dust/diel/callindex.out_CpaD03_0.10
+        ftp://ftp.astro.princeton.edu/draine/dust/diel/callindex.out_CpeD03_0.01
+        ftp://ftp.astro.princeton.edu/draine/dust/diel/callindex.out_CpeD03_0.10
+
+    Arguments:
+    ----------
+
+    species : str
+        which species to use, either 'astrosilicates' or 'graphite'
+
+    The graphite species **needs** following keyword arguments
+
+    parallel : bool
+        alignment with E-field, either parallel (true) else perpendicular
+
+    a : str
+        either '0.01' (0.01 micron) or '0.10' (0.10 micron)
+
+    """
+
+    def __init__(self, species, **kwargs):
+        """
+        Overwrite the initialization of the parent class
+        """
+        options = ['astrosilicates', 'graphite']
+        assert species.lower() in options, 'unknown species, use one of {}'.format(options)
+        #
+        # open file, read header and data
+        #
+        if species.lower() == 'astrosilicates':
+            self.material_str = 'Astronomical Silicates (Draine 2003)'
+            fname = 'callindex.out_silD03'
+            self.rho = 3.3  # laor & draine 93
+
+        elif species.lower() == 'graphite':
+            assert 'parallel' in kwargs, 'bool keyword \'parallel\' needed for graphite grains'
+            assert 'a' in kwargs, 'str keyword \'a\' needed for graphite grains'
+            parallel = kwargs.pop('parallel')
+            a = kwargs.pop('a')
+            self.material_str = 'Graphite, {}, a={} mu (Laor & Draine 1993)'.format(parallel * 'pa' + (not parallel) * 'pe', a)
+            fname = 'callindex.out_C{}D03_{}'.format('pa' * parallel + 'pe' * (not parallel), a)
+            self.rho = 2.26  # laor & draine 93
+
+        # download file if needed
+
+        self.datafile = pkg_resources.resource_filename(__name__, os.path.join(
+            'optical_constants', 'draine', fname))
+        if not os.path.isfile(self.datafile):
+            download(os.path.dirname(self.datafile))
+
+        # read from file
+
+        with open(self.datafile) as f:
+            self.headerinfo = [f.readline() for i in range(5)]
+            data = np.loadtxt(f)
         #
         # assign wavelength and optical constants
         #
@@ -564,9 +736,10 @@ class diel_WD2001_astrosil(diel_const):
         self._lk = np.log10(self._k)
         self._lmin = self._l.min()
         self._lmax = self._l.max()
+        self.rho = 3.5  # see sect 2.4
 
 
-class diel_dl84_astrosil(diel_const):
+class diel_drainelee84_astrosil(diel_const):
     """
     Returns the dielectric constants for astronomical silicates from
     Draine & Lee 1984 (and Laor & Draine 1993). The data comes from eps_Sil
@@ -605,6 +778,7 @@ class diel_dl84_astrosil(diel_const):
         self._lk = np.log10(self._k)
         self._lmin = self._l.min()
         self._lmax = self._l.max()
+        self.rho = 3.3  # DL84, page 102, 3rd paragraph
 
 
 class diel_vacuum(diel_const):
@@ -634,13 +808,16 @@ class diel_vacuum(diel_const):
         return np.array([np.ones(len(l)), np.zeros(len(l))])
 
 
-class diel_zubko_carbon(diel_const):
+class diel_zubko96(diel_const):
     """
     Returns the dielectric constants for carbon grains from Zubko et
     al. 1996 [1] (the BE, ACH2 values). The data was OCRed by Til Birnstiel, no
     guarantee for correctness.
 
     Reference: [1] https://dx.doi.org/10.1093/mnras/282.4.1321
+
+    Note: this one does not set a density, as none was found in the paper. Ricci
+    et al. 2010 assume 2.5 g/cc
 
     Arguments:
     ----------
@@ -667,7 +844,7 @@ class diel_zubko_carbon(diel_const):
         #
         directory = os.path.join('optical_constants', 'zubko+1996')
 
-        self.material_str = 'Carbonaceous Grains (Zubko et al. 1996)'
+        self.material_str = 'Carbonaceous Grains (Zubko et al. 1996, {})'.format(sample)
         self.datafile = directory
 
         E = np.loadtxt(pkg_resources.resource_filename(
@@ -693,51 +870,25 @@ class diel_zubko_carbon(diel_const):
             self.extrapolate_constants_up(lmin, lmax)
 
 
-class diel_warren(diel_const):
+class diel_warren84(diel_const):
     """
-    Returns the dielectric constants for water ice according
-    to the data by Warren 1984 [1] or the newer version
-
-    the new, updated data was downloaded from
-
-        http://www.atmos.washington.edu/ice_optical_constants/
-
-    on Jan 23, 2014 and is based on Warren & Brandt (2008) [2].
-
-    The old data was taken from the journal website, where
-    the coldest temperature column was used.
-
-    References:
-
-    - [1]  https://dx.doi.org/10.1364/AO.23.001206
-    - [2]  https://dx.doi.org/10.1029/2007JD009744
-
-    Keywords:
-    ---------
-
-    new : bool
-        use the old version of the constants if true, old if false
-
+    Returns the dielectric constants for water ice according to the data by
+    [Warren 1984](https://dx.doi.org/10.1364/AO.23.001206). The data was taken
+    from the journal website, where the coldest temperature column was used.
     """
 
-    def __init__(self, new=True):
+    def __init__(self):
         """
         Overwrite the initialization of the parent class
         """
         #
         # set the path and do some safety checks
         #
-        if new:
-            self.material_str = 'Water Ice (Warren & Brandt 2008)'
-        else:
-            self.material_str = 'Water Ice (Warren 1984)'
+        self.material_str = 'Water Ice (Warren 1984)'
         #
         # set the file name
         #
-        if new:
-            fname = 'IOP_2008_ASCIItable.dat'
-        else:
-            fname = 'warren_1984.txt'
+        fname = 'warren_1984.txt'
         self.datafile = pkg_resources.resource_filename(
             __name__, os.path.join('optical_constants', 'warren', fname))
         if not os.path.isfile(self.datafile):
@@ -757,9 +908,54 @@ class diel_warren(diel_const):
         self._lk = np.log10(self._k)
         self._lmin = self._l.min()
         self._lmax = self._l.max()
+        self.rho = 0.917  # Warren 1984, page 1215
 
 
-class diel_luca(diel_const):
+class diel_warrenbrandt08(diel_const):
+    """
+    Returns the dielectric constants for water ice according
+    to the updated water data downloaded from
+
+        http://www.atmos.washington.edu/ice_optical_constants/
+
+    on Jan 23, 2014, and based on [Warren & Brandt (2008)](https://dx.doi.org/10.1029/2007JD009744).
+    """
+
+    def __init__(self):
+        """
+        Overwrite the initialization of the parent class
+        """
+        #
+        # set the path and do some safety checks
+        #
+        self.material_str = 'Water Ice (Warren & Brandt 2008)'
+        #
+        # set the file name
+        #
+        fname = 'IOP_2008_ASCIItable.dat'
+        self.datafile = pkg_resources.resource_filename(
+            __name__, os.path.join('optical_constants', 'warren', fname))
+        if not os.path.isfile(self.datafile):
+            download(self.datafile)
+        #
+        # read data and assign wavelength and optical constants
+        #
+        data = np.loadtxt(self.datafile)
+        self._l = data[:, 0] * 1e-4
+        self._n = data[:, 1]
+        self._k = data[:, 2]
+        #
+        # assign derived attributes
+        #
+        self._ll = np.log10(self._l)
+        self._ln = np.log10(self._n)
+        self._lk = np.log10(self._k)
+        self._lmin = self._l.min()
+        self._lmax = self._l.max()
+        self.rho = 0.917  # Warren 1984, page 1215
+
+
+class diel_ricci10(diel_const):
     """
     Returns the dielectric constants from Luca Riccis files
     (cf. Ricci et al. 2010, A&A vol. 512, p. 15)
@@ -902,8 +1098,12 @@ class diel_mixed():
         extrapol : bool
             whether or not to extrapolate constants beyond there defined interval
         """
-        if rule not in ['Bruggeman', 'Maxwell-Garnett']:
+        if rule.lower() not in ['bruggeman', 'maxwell-garnett']:
             raise NameError('Unknown mixing rule: %s' % rule)
+        if rule.lower() == 'maxwell-garnett':
+            print('using Maxwell-Garnett mixing: first component should be host material (= matrix)')
+            if constants[0].material_str is not None:
+                print('    matrix = {}'.format(constants[0].material_str))
 
         self.material_str = '%s-Mix of %i species' % (rule, len(constants))
         self.constants = constants
@@ -935,9 +1135,9 @@ class diel_mixed():
 
         for i, l in enumerate(l_arr):
             #
-            # calculate eps = (n - I*k)**2 for each material
+            # calculate eps = (n + I*k)**2 for each material
             #
-            eps = np.array([complex(*c.nk(l)).conjugate()**2 for c in self.constants])
+            eps = np.array([complex(*c.nk(l))**2 for c in self.constants])
 
             if self.rule.lower() == 'bruggeman':
                 #
@@ -948,15 +1148,33 @@ class diel_mixed():
                 eps_mean[i] = complex(findroot(fct, complex(0.5, 0.5)))
             elif self.rule.lower() == 'maxwell-garnett':
                 #
-                # e.g. kataoka et al. 2014, eq. 3
+                # kataoka et al. 2014, eq. 3
                 #
-                fj_gammaj = np.array(self.abundances) * 3. / (eps + 2.)
-                eps_mean[i] = (fj_gammaj * eps).sum() / (fj_gammaj.sum())
+                # fj_gammaj = np.array(self.abundances) * 3. / (eps + 2.)
+                # eps_mean[i] = (fj_gammaj * eps).sum() / (fj_gammaj.sum())
+                #
+                # according to another paper, turns out to be equivalent
+                #
+                # eps_h = eps[0]
+                # eps_i = eps[1:]
+                # f_i = self.abundances[1:]
+                # R = (f_i * (eps_i - eps_h) / (eps_i + 2 * eps_h)).sum(0)
+                # eps_mean[i] = eps_h * (1 + 2 * R) / (1 - R)
+                #
+                # according to Bohren & Huffman
+                #
+                eps_m = eps[0]
+                eps_i = eps[1:]
+                f_i = self.abundances[1:]
+                beta_i = 3 * eps_m / (eps_i + 2 * eps_m)
+                f = sum(f_i)
+                eps_mean[i] = ((1 - f) * eps_m + (f_i * beta_i * eps_i).sum()) / \
+                    (1 - f + (f_i * beta_i).sum())
             #
             # return n and k
             #
             eps_mean = np.sqrt(eps_mean)
-            return np.array([eps_mean.real.squeeze(), -eps_mean.imag.squeeze()])
+            return np.array([eps_mean.real.squeeze(), eps_mean.imag.squeeze()])
 
     def get_normal_object(self):
         """
@@ -964,14 +1182,8 @@ class diel_mixed():
         called. We can make this object behave like the other optical constants
         with this function. This will return a diel_const object.
         """
-        d = diel_const()
 
         const = self.constants
-
-        d.datafile = ''
-
-        for c in const:
-            d.datafile += c.datafile + '\n'
 
         lmin = np.max([c._lmin for c in const])
         lmax = np.min([c._lmax for c in const])
@@ -983,19 +1195,14 @@ class diel_mixed():
         for i, _lam in enumerate(lam):
             n[i], k[i] = self.nk(_lam)
 
+        d = diel_const(lam, n, k)
+        d.datafile = ''
+
+        for c in const:
+            d.datafile += c.datafile + '\n'
+
         d.material_str = self.material_str
         d.extrapol = self.extrapol
-
-        d._l = lam
-        d._n = n
-        d._k = k
-        d._ll = np.log10(lam)
-        d._ln = np.log10(n)
-        d._lk = np.log10(k)
-        d._lmin = lmin
-        d._lmax = lmax
-
-        d._has_negative_n = np.any(d._n <= 0)
 
         return d
 
@@ -1212,7 +1419,7 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function,
     theta : array
         angles
 
-    g_sca : array
+    g : array
         assymetry factor
 
     S1, S2 : arrays
@@ -1292,16 +1499,24 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function,
         #
         q_abs[ia + 1:, ilam] = q_abs[ia, ilam]
         q_sca[ia + 1:, ilam] = q_sca[ia, ilam]
-        g_sca[ia + 1:, ilam] = g_sca[ia, ilam]
+
+        # Laor & Draine 1993, Eq. 8
+
+        g_sca[ia + 1:, ilam] = 0.3 * X[ia + 1:]**2 / (1 + 0.3 * X[ia + 1:]**2)  # g_sca[ia, ilam]
 
     package = {
         'q_abs': q_abs,
         'q_sca': q_sca,
-        'g_sca': g_sca,
+        'g': g_sca,
         'S1': s_1,
         'S2': s_2,
         'theta': np.linspace(0, 180., 2 * nang - 1)
         }
+
+    package['info'] = """Created with the disklab package by Kees Dullemond and Til Birnstiel.
+    If you make use of this file or package, do cite the according paper
+    Dullemond & Birnstiel 2018.
+    """
 
     return package
 
@@ -1373,6 +1588,64 @@ def make_opacity_dict(lam, a, k_abs, k_sca, g_sca, rho_s, zscat=None):
         }
 
     return package
+
+
+def write_disklab_opacity(fname, opac_dict, dir='.'):
+    """
+    Write the output of a Mie opacity calculation to a file. Minimum requirement
+    is particle size and wavelength grid along with the according absorption and
+    scattering opacities [cm^2/g].
+
+    Arguments:
+    ----------
+
+    fname : str
+        file name under which to store the data
+
+    opac_dict : dict
+        opacity information. needs to have:
+            a : array
+                particle size array [cm]
+
+            lam : array
+                wavelength array [cm]
+
+            k_abs, k_sca : arrays
+                absorption and scattering opacities shape = (len(a), len(lam))
+        Optional:
+            g : array
+                Henyey-Greenstein anisotropy factor, shape = k_abs.shape
+
+            rho_s : array
+                material density of the grains
+
+    Keywords:
+    ---------
+
+    dir : str
+        path where to store the file, defaults to current directory
+    """
+
+    assert 'a' in opac_dict, 'opacity dictionary needs to contain particle size array \'a\''
+    assert 'lam' in opac_dict, 'opacity dictionary needs to contain wave length array \'lam\''
+    assert 'k_abs' in opac_dict, 'opacity dictionary needs to contain absortpion opacity array \'k_abs\''
+    assert 'k_sca' in opac_dict, 'opacity dictionary needs to contain scattering opacity array \'k_sca\''
+
+    # build a dict that contains only the data we need
+
+    dictionary = {}
+    dictionary['a']     = opac_dict['a']
+    dictionary['lam']   = opac_dict['lam']
+    dictionary['k_abs'] = opac_dict['k_abs']
+    dictionary['k_sca'] = opac_dict['k_sca']
+    if 'g' in opac_dict:
+        dictionary['g'] = opac_dict['g']
+    if 'rho_s' in opac_dict:
+        dictionary['rho_s'] = opac_dict['rho_s']
+    if 'info' in opac_dict:
+        dictionary['info'] = opac_dict['info']
+
+    np.savez_compressed(os.path.join(dir, fname), **dictionary)
 
 
 def write_radmc3d_scatmat_file(index, opacity_dict, name, dir='.'):
@@ -1455,7 +1728,7 @@ def write_radmc3d_scatmat_file(index, opacity_dict, name, dir='.'):
         f.write('\n')
 
 
-def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False, ax=None):
+def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False, ax=None, twoaxes=True):
     """
     Compares the dielectric functions c1 and c2 (their n and k values)
     by plotting them on the range from amin to amax.
@@ -1478,8 +1751,13 @@ def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False, ax=None):
     orig_data : bool
         if true, then just plot the original data of each object
 
-    ax : plt.axes
-        plot into those axes, or create new figure/axes
+    ax : None | plt.axes | list
+        ax = None: create new figure/axes
+        ax = plt.axes, plot into these axes, if twoaxes=True, add twin axis
+        ax = list: plot into those axes, then twoaxes=True automatically
+
+    twoaxes : bool
+        if true, then use two different y axes for n and k
 
     Output:
     -------
@@ -1492,6 +1770,19 @@ def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False, ax=None):
 
     if ax is None:
         f, ax = plt.subplots()
+
+    if isinstance(ax, (list, np.ndarray)):
+        ax1 = ax[0]
+        ax2 = ax[1]
+        twoaxes = True
+    else:
+        ax1 = ax
+        if twoaxes:
+            ax2 = plt.twinx(ax1)
+        else:
+            ax2 = ax1
+
+    lines = []
 
     for n, c in enumerate(constants):
         nk = np.zeros([len(lam), 2])
@@ -1507,34 +1798,47 @@ def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False, ax=None):
                     nk[i] = np.nan
 
         mask = np.invert(np.isnan(nk[:, 0]))
-        ax.loglog(lam[mask], nk[:, 0][mask], label='$n_1$ - {}'.format(c.material_str), c='C{}'.format(n), alpha=0.7, ls='-')
+        lines += ax1.loglog(lam[mask], nk[:, 0][mask], label='$n_1$ - {}'.format(c.material_str), alpha=0.7, ls='-')
         mask = np.invert(np.isnan(nk[:, 1]))
-        ax.loglog(lam[mask], nk[:, 1][mask], label='$k_1$ - {}'.format(c.material_str), c='C{}'.format(n), alpha=0.7, ls='--')
+        lines += ax2.loglog(lam[mask], nk[:, 1][mask], label='$k_1$ - {}'.format(c.material_str), c=lines[-1].get_color(), alpha=0.7, ls='--')
 
-    ax.set_xlabel('wavelength [cm]')
-    ax.set_ylabel('$n, k$')
-    ax.legend(loc='best')
+    ax1.set_xlabel('wavelength [cm]')
+    if twoaxes:
+        ax1.set_ylabel('$n$')
+        ax2.set_ylabel('$k$')
+        ax1.set_yscale('linear')
+    else:
+        ax1.set_ylabel('$n, k$')
 
-    return ax
+    ax1.legend(lines, [l.get_label() for l in lines], loc='best', fontsize='small')
+
+    if twoaxes:
+        return ax1, ax2
+    else:
+        return ax1
 
 
-def get_default_diel_constants(extrapol=False, lmax=None):
+def get_default_diel_constants(extrapol=False, lmax=None, rule='Maxwell-Garnett'):
     """
     This method calculates the mixed mie coefficients as in Ricci et al. 2010.
 
     The densities and volume fractions stated in Ricci et al. 2010 contained
     typos. The values used here come from L. Ricci, private communications.
 
-    |                 | silicates |  carbonaceous | water ice | vacuum |
-    |:---------------:|:---------:|:-------------:|:---------:|:------:|
-    | volume fraction | 0.07      |     0.21      |    0.42   | 0.30   |
-    | solid densities | 3.5 g/cc  |    2.5 g/cc   |  1 g/cc   | 0 g/cc |
+    |                 | vacuum | silicates |  carbonaceous | water ice |
+    |:---------------:|:------:|:---------:|:-------------:|:---------:|
+    | volume fraction | 0.30   | 0.07      |     0.21      |    0.42   |
+    | solid densities | 0 g/cc | 3.5 g/cc  |    2.5 g/cc   |  1 g/cc   |
 
     Keywords:
     ---------
 
     extrapol : bool
         whether the optical constants do extrapolation or not
+
+    rule : str
+        'Bruggeman' or 'Maxwell-Garnett'. We use the MG rule by default, but
+        Ricci et al. 2010 used 'Bruggeman'.
 
     Output:
     -------
@@ -1548,19 +1852,19 @@ def get_default_diel_constants(extrapol=False, lmax=None):
     if extrapol and (lmax is None):
         raise ValueError('need to set lmax if extrapol is True')
 
-    c1 = diel_draine2003_astrosil()
-    c2 = diel_zubko_carbon(extrapol=extrapol, lmax=lmax)
-    c3 = diel_warren(new=True)
-    c4 = diel_vacuum()
+    c0 = diel_vacuum()
+    c1 = diel_draine2003('astrosilicates')
+    c2 = diel_zubko96(extrapol=extrapol, lmax=lmax)
+    c3 = diel_warrenbrandt08()
 
-    constants = [c1, c2, c3, c4]
+    constants = [c0, c1, c2, c3]
 
     # after Lucas thesis, the fractions in Ricci+2010 are typos
 
-    vol_fract = [0.07, 0.21, 0.42, 0.30]
-    densities = [3.50, 2.50, 1.00, 0.00]
+    vol_fract = [0.30, 0.07, 0.21, 0.42]
+    densities = [0.00, 3.50, 2.50, 1.00]
 
-    diel_constants = diel_mixed(constants, vol_fract, rule='Bruggeman')
+    diel_constants = diel_mixed(constants, vol_fract, rule=rule)
     rho_s = sum(densities * np.array(vol_fract))
 
     return diel_constants, rho_s
@@ -1615,7 +1919,7 @@ def get_opacities(a, lam, rho_s=None, diel_const=None, bhmie_function=bhmie_func
     theta : array
         angle (in degree, 0=forward) on which angle dependent quantities are defined
 
-    g_sca : array
+    g : array
         Henyey-Greenstein scattering asymmetry factor
 
     S1, S2 : arrays
@@ -1623,6 +1927,12 @@ def get_opacities(a, lam, rho_s=None, diel_const=None, bhmie_function=bhmie_func
 
     rho_s : float
         material density of the grains [g/cm^3]
+
+    a : array
+        The grain size grid in cm
+
+    lam : array
+        the wavelength grid in cm
 
     """
     if (diel_const is None and rho_s is not None) or (diel_const is not None and rho_s is None):
@@ -1649,6 +1959,9 @@ def get_opacities(a, lam, rho_s=None, diel_const=None, bhmie_function=bhmie_func
     package['k_abs'] = kappa_abs
     package['k_sca'] = kappa_sca
 
+    package['a'] = a
+    package['lam'] = lam
+
     return package
 
 
@@ -1658,8 +1971,10 @@ def size_average_opacity(lam_avg, a, lam, k_abs, k_sca, q=3.5, plot=False, ax=No
 
     Arguments:
     ----------
-    lam_avg : float
+    lam_avg : float | array
         wavelength at which to calculate the size-averaged opacities
+        if a 2 element array is given, also beta will be calculatedself. The size
+        averaged opacity of the first wavelength will be returned/plotted
 
     a : array
         particle size array [cm]
@@ -1696,31 +2011,81 @@ def size_average_opacity(lam_avg, a, lam, k_abs, k_sca, q=3.5, plot=False, ax=No
     import matplotlib.pyplot as plt
 
     # interpolate at the observed frequencies
+    lam_avg = np.array(lam_avg, ndmin=1)
+    if len(lam_avg) > 1:
+        calc_beta = True
+    else:
+        calc_beta = False
 
-    k_a = np.array([np.interp(lam_avg, lam, k_abs[ia, :]) for ia in range(len(a))])
-    k_s = np.array([np.interp(lam_avg, lam, k_sca[ia, :]) for ia in range(len(a))])
+    k_a = []
+    k_s = []
+
+    for _lam in lam_avg:
+        k_a += [[np.interp(_lam, lam, k_abs[ia, :]) for ia in range(len(a))]]
+        k_s += [[np.interp(_lam, lam, k_sca[ia, :]) for ia in range(len(a))]]
+
+    k_a = np.array(k_a)
+    k_s = np.array(k_s)
 
     # average over size distributions
 
-    ka = np.zeros_like(a)
-    ks = np.zeros_like(a)
+    ka = np.zeros([len(lam_avg), len(a)])
+    ks = np.zeros([len(lam_avg), len(a)])
     for ia in range(len(a)):
+
+        # make a size distribution
+
         s = (a / a[0])**(4 - q)
         if ia < len(a) - 1:
             s[ia + 1:] = 1e-100
         s = s / s.sum()
-        ka[ia] = np.sum(k_a * s)
-        ks[ia] = np.sum(k_s * s)
+
+        for ilam in range(len(lam_avg)):
+            ka[ilam, ia] = np.sum(k_a[ilam, :] * s)
+            ks[ilam, ia] = np.sum(k_s[ilam, :] * s)
+
+    ret = {'ka': ka, 'ks': ks}
+
+    # calculate beta
+
+    if calc_beta:
+        beta = -np.log10(ka[-1, :] / ka[0, :]) / np.log10(lam_avg[-1] / lam_avg[0])
+        ret['beta']: beta
+
     if plot:
         if ax is None:
             f, ax = plt.subplots()
-        ax.loglog(a, ka, '-', label='absorption, $\lambda = {:2.2g}$ mm'.format(lam_avg * 10))
-        ax.loglog(a, ks, '--', label='scattering, $\lambda = {:2.2g}$ mm'.format(lam_avg * 10))
-        ax.set_xlabel('$a_\mathrm{max}$ [cm]')
-        ax.set_ylabel('$\kappa$ [cm$^2$/g]')
-        ax.set_xlim(1e-4, 1e2)
-        ax.set_ylim(0.01, 50)
-        ax.legend()
-        return ka, ks, ax
-    else:
-        return ka, ks
+        ax = np.array(ax, ndmin=1)
+        lines = []
+        lines += ax[0].loglog(a, ka[0, :], '-', label='absorption, $\lambda = {:2.2g}$ mm'.format(lam_avg[0] * 10))
+        lines += ax[0].loglog(a, ks[0, :], '--', label='scattering, $\lambda = {:2.2g}$ mm'.format(lam_avg[0] * 10))
+        ax[0].set_xlabel('$a_\mathrm{max}$ [cm]')
+        ax[0].set_ylabel('$\kappa$ [cm$^2$/g]')
+        ax[0].set_xlim(1e-4, 1e2)
+        ax[0].set_ylim(0.01, 50)
+
+        one_leg = True
+        lines2 = []
+        if calc_beta:
+            if len(ax) == 2:
+                ax2 = ax[1]
+                ax2.set_xlabel('$a_\mathrm{max}$ [cm]')
+                one_leg = False
+            else:
+                ax2 = plt.twinx(ax[0])
+
+            lines2 += ax2.semilogx(a, beta, 'k-', label=r'$\beta$')
+            ax2.set_ylabel(r'$\beta$')
+            ax2.set_ylim(0, 4)
+            ret['ax2'] = ax2
+
+        if one_leg:
+            lines += lines2
+            ax[0].legend(lines, [_l.get_label() for _l in lines])
+        else:
+            ax[0].legend(lines, [_l.get_label() for _l in lines])
+            ax2.legend(lines2, [_l.get_label() for _l in lines2])
+
+        ret['ax1'] = ax[0]
+
+    return ret

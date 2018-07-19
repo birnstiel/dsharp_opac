@@ -1,5 +1,9 @@
 {
     "original astro. silicates": "ftp://ftp.astro.princeton.edu/draine/dust/diel/eps_Sil",
     "Draine 2003 astro. silicates": "ftp://ftp.astro.princeton.edu/draine/dust/diel/callindex.out_silD03",
-    "Weingartner & Draine 2001 astr. silicates": "ftp://ftp.astro.princeton.edu/draine/dust/diel/eps_suvSil"
+    "Weingartner & Draine 2001 astr. silicates": "ftp://ftp.astro.princeton.edu/draine/dust/diel/eps_suvSil",
+    "Draine 2003 carbon, parallel, A=0.01 micron": "ftp://ftp.astro.princeton.edu/draine/dust/diel/callindex.out_CpaD03_0.01",
+    "Draine 2003 carbon, parallel, A=0.1 micron": "ftp://ftp.astro.princeton.edu/draine/dust/diel/callindex.out_CpaD03_0.10",
+    "Draine 2003 carbon, perpendicular, A=0.01 micron": "ftp://ftp.astro.princeton.edu/draine/dust/diel/callindex.out_CpeD03_0.01",
+    "Draine 2003 carbon, perpendicular, A=0.1 micron": "ftp://ftp.astro.princeton.edu/draine/dust/diel/callindex.out_CpeD03_0.10"
 }
