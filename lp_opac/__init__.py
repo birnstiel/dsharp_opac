@@ -9,23 +9,30 @@ from .lp_opac import \
     diel_const, \
     diel_from_lnk_file, \
     diel_henning, \
-    diel_draine2003_astrosil, \
+    diel_jaeger98, \
+    diel_preibisch93, \
+    diel_pollack1994, \
+    diel_draine2003, \
     diel_WD2001_astrosil, \
-    diel_dl84_astrosil, \
+    diel_drainelee84_astrosil, \
     diel_vacuum, \
-    diel_zubko_carbon, \
-    diel_warren, \
-    diel_luca, \
+    diel_zubko96, \
+    diel_warren84, \
+    diel_warrenbrandt08, \
+    diel_ricci10, \
     diel_mixed, \
     powerlaw_N_of_a, \
     gaussian_N_of_a, \
     get_kappa_from_q, \
     get_size_averaged_opacity, \
     get_mie_coefficients, \
-    compare_nk, \
-    get_default_diel_constants, \
-    get_opacities, \
     calculate_mueller_matrix, \
+    make_opacity_dict, \
+    write_disklab_opacity, \
+    write_radmc3d_scatmat_file, \
+    compare_nk, \
+    get_ricci_mix, \
+    get_opacities, \
     size_average_opacity
 
 __all__ = [
@@ -35,22 +42,28 @@ __all__ = [
     'diel_const',
     'diel_from_lnk_file',
     'diel_henning',
-    'diel_draine2003_astrosil',
+    'diel_jaeger98',
+    'diel_preibisch93',
+    'diel_pollack1994',
+    'diel_draine2003',
     'diel_WD2001_astrosil',
-    'diel_dl84_astrosil',
+    'diel_drainelee84_astrosil',
     'diel_vacuum',
-    'diel_zubko_carbon',
-    'diel_warren',
-    'diel_luca',
+    'diel_zubko96',
+    'diel_warren84',
+    'diel_warrenbrandt08',
+    'diel_ricci10',
     'diel_mixed',
     'powerlaw_N_of_a',
     'gaussian_N_of_a',
     'get_kappa_from_q',
     'get_size_averaged_opacity',
     'get_mie_coefficients',
-    'compare_nk',
-    'get_default_diel_constants',
-    'get_opacities',
     'calculate_mueller_matrix',
-    'size_average_opacity'
-    ]
+    'make_opacity_dict',
+    'write_disklab_opacity',
+    'write_radmc3d_scatmat_file',
+    'compare_nk',
+    'get_ricci_mix',
+    'get_opacities',
+    'size_average_opacity']

@@ -5,6 +5,7 @@ This module contains opacity scripts and all the helper and testing routines.
 - dielectric functions are objects, see bhmie.diel_*
   the functions `diel_*.nk` return the optical properties
 """
+from __future__ import print_function
 import numpy as np
 import os
 import sys
@@ -512,7 +513,7 @@ class diel_jaeger98(diel_const):
     Returns the dielectric constants for the various carbonaceous dust optical
     constants from:
 
-    [Jäger et al. 1998](http://adsabs.harvard.edu/abs/1998A%26A...332..291J)
+    [Jaeger et al. 1998](http://adsabs.harvard.edu/abs/1998A%26A...332..291J)
 
     Densities are given as:
 
@@ -537,7 +538,7 @@ class diel_jaeger98(diel_const):
         temps = [400, 600, 800, 1000]
         rhos  = [1.435, 1.670, 1.843, 1.988]
         assert T in temps, "invalid temperature, use {}".format(temps)
-        self.material_str = 'Carbonaceous dust, T={} C (Jäger et al. 1998)'.format(T)
+        self.material_str = 'Carbonaceous dust, T={} C (Jaeger et al. 1998)'.format(T)
         self.rho = rhos[temps.index(T)]
 
         fname = 'cel{}.lnk'.format(T)
@@ -602,6 +603,60 @@ class diel_preibisch93(diel_const):
             'optical_constants', 'preibisch', fname))
         if not os.path.isfile(self.datafile):
             download(os.path.dirname(self.datafile))
+        #
+        # read data
+        #
+        print('Reading opacities from %s' % fname)
+        data = np.loadtxt(self.datafile)
+        #
+        # assign wavelength and optical constants
+        #
+        self._l = data[:, 0]
+        self._n = data[:, 1]
+        self._k = data[:, 2]
+        self._ll = np.log10(self._l)
+        self._ln = np.log10(self._n)
+        self._lk = np.log10(self._k)
+        self._lmin = self._l.min()
+        self._lmax = self._l.max()
+
+
+class diel_pollack1994(diel_const):
+    """
+    Returns the DIGITIZED dielectric constants for the materials from
+    Pollack et al. 1994
+
+    [Pollack et al. 1994](https://dx.doi.org/10.1086/173677)
+
+    These have been digitized from Fig. 1 in the paper and no guarantee can be
+    given. There will be measurement errors from the digitization process.
+
+    Arguments:
+    ----------
+
+    species : str
+        which species to use, can be
+            - water ice
+            - troilite
+            - organics
+    """
+
+    def __init__(self, species):
+        """
+        Overwrite the initialization of the parent class
+        """
+        #
+        # set the path and do some safety checks
+        #
+        species = species.lower()
+        options = ['water ice', 'troilite', 'organics']
+        assert species in options, "unknown species, use one of {}".format(options)
+        self.material_str = '{}, (Pollack et al. 1994)'.format(species.capitalize())
+
+        fname = 'P94-{}.lnk'.format(species.replace(' ', ''))
+
+        self.datafile = pkg_resources.resource_filename(__name__, os.path.join(
+            'optical_constants', 'pollack1994', fname))
         #
         # read data
         #
@@ -1818,7 +1873,7 @@ def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False, ax=None, twoaxes
         return ax1
 
 
-def get_default_diel_constants(extrapol=False, lmax=None, rule='Maxwell-Garnett'):
+def get_ricci_mix(extrapol=False, lmax=None, rule='Bruggeman'):
     """
     This method calculates the mixed mie coefficients as in Ricci et al. 2010.
 
@@ -1837,8 +1892,7 @@ def get_default_diel_constants(extrapol=False, lmax=None, rule='Maxwell-Garnett'
         whether the optical constants do extrapolation or not
 
     rule : str
-        'Bruggeman' or 'Maxwell-Garnett'. We use the MG rule by default, but
-        Ricci et al. 2010 used 'Bruggeman'.
+        'Bruggeman' or 'Maxwell-Garnett'. Ricci et al. 2010 used 'Bruggeman'.
 
     Output:
     -------
@@ -1941,7 +1995,8 @@ def get_opacities(a, lam, rho_s=None, diel_const=None, bhmie_function=bhmie_func
     if diel_const is None and rho_s is None:
         if extrapol:
             print('Note: wavelength range outside data. Extrapolation will be done but is uncertain.')
-        diel_const, rho_s = get_default_diel_constants(extrapol=extrapol, lmax=lam[-1])
+        print('Note: no dielectric constants given, will use Ricci-2010-like optical constants')
+        diel_const, rho_s = get_ricci_mix(extrapol=extrapol, lmax=lam[-1])
 
     m = 4 * np.pi / 3. * rho_s * a**3
 
@@ -2050,7 +2105,7 @@ def size_average_opacity(lam_avg, a, lam, k_abs, k_sca, q=3.5, plot=False, ax=No
 
     if calc_beta:
         beta = -np.log10(ka[-1, :] / ka[0, :]) / np.log10(lam_avg[-1] / lam_avg[0])
-        ret['beta']: beta
+        ret['beta'] = beta
 
     if plot:
         if ax is None:
