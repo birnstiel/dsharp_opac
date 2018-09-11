@@ -4,7 +4,7 @@ try:
 except ImportError:
     print('fortran mie routines unavailable')
 try:
-    from .distributions import fit_module
+    from .fit_module import fit_module
     distribution = fit_module.fit_function18_test
 except ImportError:
     distribution = None

@@ -23,6 +23,6 @@ setup(name=PACKAGENAME,
       zip_safe=False,
       ext_modules=[
           Extension(name='lp_opac.bhmie_fortran', sources=['lp_opac/bhmie_fortran.f90']),
-          Extension(name='lp_opac.distributions', sources=['lp_opac/distribution/fit_module.f90']),
+          Extension(name='lp_opac.fit_module', sources=['lp_opac/fit_module.f90']),
           ],
       )
