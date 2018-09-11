@@ -32,6 +32,7 @@ from .lp_opac import \
     write_radmc3d_scatmat_file, \
     compare_nk, \
     get_ricci_mix, \
+    get_dsharp_mix, \
     get_opacities, \
     size_average_opacity
 
@@ -65,5 +66,6 @@ __all__ = [
     'write_radmc3d_scatmat_file',
     'compare_nk',
     'get_ricci_mix',
+    'get_dsharp_mix',
     'get_opacities',
     'size_average_opacity']

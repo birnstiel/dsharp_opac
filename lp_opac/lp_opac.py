@@ -639,6 +639,9 @@ class diel_pollack1994(diel_const):
             - water ice
             - troilite
             - organics
+            - olivine
+            - iron
+            - orthopyroxene
     """
 
     def __init__(self, species):
@@ -649,7 +652,7 @@ class diel_pollack1994(diel_const):
         # set the path and do some safety checks
         #
         species = species.lower()
-        options = ['water ice', 'troilite', 'organics']
+        options = ['water ice', 'troilite', 'organics', 'olivine', 'iron', 'orthopyroxene']
         assert species in options, "unknown species, use one of {}".format(options)
         self.material_str = '{}, (Pollack et al. 1994)'.format(species.capitalize())
 
@@ -1871,6 +1874,85 @@ def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False, ax=None, twoaxes
         return ax1, ax2
     else:
         return ax1
+
+
+def get_dsharp_mix(fm_ice=0.2, rule='Bruggeman'):
+    """
+    This method calculates the mixed mie coefficients for the DSHARP project.
+
+    The densities and volume fractions are based on D'Alessio et al. 2001, 2006.
+    However newer optical constants are used and the water fraction comes from
+    Rosetta measurements.
+
+    |                 | water ice | astrosilicates | troilite    | organics  |
+    |:---------------:|:---------:|:--------------:|:-----------:|:---------:|
+    | volume fraction | 0.5737    | 0.1120         | 0.0173      | 0.2970    |
+    | solid densities | 0.92 g/cc | 3.3 g/cc       | 4.83 g/cc   | 1.5 g/cc  |
+
+    Keywords:
+    ---------
+
+    fm_ice : float
+        mass fraction of water ice.
+
+    rule : str
+        'Bruggeman' or 'Maxwell-Garnett'. Ricci et al. 2010 used 'Bruggeman'.
+
+    Output:
+    -------
+
+    diel_constants : object of class diel_const
+        the mixed dielectric constants
+
+    rho_s : float
+        the material density of the particles in g/cm**3
+    """
+    # define arrays for optical constants, bulk densities, and volume fractions for each species
+
+    constants = [
+        diel_warrenbrandt08(),
+        diel_draine2003('astrosilicates'),
+        diel_henning('troilite'),
+        diel_henning('organics'),
+        ]
+
+    # material densities
+
+    densities = np.array([
+        0.92,
+        3.30,
+        4.83,
+        1.50])
+
+    # fm_rest is the normalized mass fractions of the rest (adding up to 1)
+
+    fm_rest = np.array([0.41127, 0.09292, 0.49581])
+    f_mass = np.hstack((
+        fm_ice,
+        (1 - fm_ice) * fm_rest))
+
+    # calculate the mean density, needed to get opacity in units of cm^2/g
+
+    rho_s = 1.0 / (f_mass / densities).sum()
+
+    f_vol = rho_s / densities * f_mass
+    f_vol = f_vol / f_vol.sum()
+
+    length = max([len(c.material_str) for c in constants])
+    length = max([length, 16])
+
+    print('| material'.ljust(length + 2) + '| volume fractions | mass fractions |')
+    print('|' + (length + 1) * '-' + '|' + 18 * '-' + '|' + 16 * '-' + '|')
+    for c, fv, fm in zip(constants, f_vol, f_mass):
+        print(
+            '| ' +
+            c.material_str.ljust(length) +
+            '| {:.4}'.format(fv).ljust(19) +
+            '| {:.4}'.format(fm).ljust(17) + '|')
+
+    # mix the optical constants using the Bruggeman rule
+
+    return diel_mixed(constants, f_vol, rule=rule), rho_s
 
 
 def get_ricci_mix(extrapol=False, lmax=None, rule='Bruggeman'):
