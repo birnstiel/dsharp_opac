@@ -21,6 +21,8 @@ setup(name=PACKAGENAME,
       package_data={PACKAGENAME: ['optical_constants/*/*', 'optical_constants/*/*/*']},
       install_requires=['scipy', 'numpy', 'matplotlib'],
       zip_safe=False,
-      ext_modules=[Extension(name='lp_opac.bhmie_fortran', sources=[
-              'lp_opac/bhmie_fortran.f90'])],
+      ext_modules=[
+          Extension(name='lp_opac.bhmie_fortran', sources=['lp_opac/bhmie_fortran.f90']),
+          Extension(name='lp_opac.distributions', sources=['lp_opac/distribution/fit_module.f90']),
+          ],
       )

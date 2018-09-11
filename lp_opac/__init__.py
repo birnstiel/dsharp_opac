@@ -3,6 +3,12 @@ try:
     from .bhmie_fortran import bhmie_fortran
 except ImportError:
     print('fortran mie routines unavailable')
+try:
+    from .distributions import fit_module
+    distribution = fit_module.fit_function18_test
+except ImportError:
+    distribution = None
+    print('fortran size distribution code unavailable')
 
 from .lp_opac import \
     progress_bar, \
@@ -68,4 +74,5 @@ __all__ = [
     'get_ricci_mix',
     'get_dsharp_mix',
     'get_opacities',
-    'size_average_opacity']
+    'size_average_opacity',
+    'distribution']
