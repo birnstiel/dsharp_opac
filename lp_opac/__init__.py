@@ -7,8 +7,8 @@ try:
     from .fit_module import fit_module
     distribution = fit_module.fit_function18_test
 except ImportError:
-    distribution = None
-    print('fortran size distribution code unavailable')
+    def distribution(*args, **kwargs):
+        raise ImportError('fortran size distribution code unavailable! Apparently it was not installed with f2py')
 
 from .lp_opac import \
     progress_bar, \

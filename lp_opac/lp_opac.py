@@ -1868,7 +1868,7 @@ def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False, ax=None, twoaxes
     else:
         ax1.set_ylabel('$n, k$')
 
-    ax1.legend(lines, [l.get_label() for l in lines], loc='best', fontsize='small')
+    ax1.legend(lines, [l.get_label() for l in lines], loc='best', fontsize='xx-small')
 
     if twoaxes:
         return ax1, ax2
