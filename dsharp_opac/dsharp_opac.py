@@ -168,6 +168,7 @@ class diel_const(object):
     extrapol = False
     _has_negative_n = False
     rho = None
+    reference = None
 
     def __init__(self, lam, n, k):
         """
@@ -188,6 +189,12 @@ class diel_const(object):
         self._lmin = lam[0]
         self._lmax = lam[-1]
         self._has_negative_n = np.any(n <= 0)
+        self.print_reference()
+
+    def print_reference(self, appendix=''):
+        """Prints the citation request, appends appendix"""
+        if self.reference is not None:
+            print('Please cite {} when using these optical constants'.format(self.reference) + appendix)
 
     def nk(self, l):
         """
@@ -367,10 +374,13 @@ class diel_from_lnk_file(diel_const):
     Keywords:
     ---------
     headerlines : int
-    :    number of lines in header
+        number of lines in header
+
+    reference : None | str
+        set the reference to this string
     """
 
-    def __init__(self, datafile, headerlines=0):
+    def __init__(self, datafile, headerlines=0, reference=None):
         """
         Overwrite the initialization of the parent class
         """
@@ -396,6 +406,8 @@ class diel_from_lnk_file(diel_const):
 
         if any(self._n <= 0):
             self._has_negative_n = True
+
+        self.print_reference()
 
 
 class diel_henning(diel_const):
@@ -483,6 +495,7 @@ class diel_henning(diel_const):
         self.rho = densities[fname]
         self.datafile = pkg_resources.resource_filename(__name__, os.path.join(
             'optical_constants', 'henning', 'new' * new + 'old' * (not new), fname + '.lnk'))
+        self.reference = 'Henning & Stognienko (1996)' + (not new) * ', Pollack et al. (1994)'
         if not os.path.isfile(self.datafile):
             self.download()
         #
@@ -501,6 +514,7 @@ class diel_henning(diel_const):
         self._lk = np.log10(self._k)
         self._lmin = self._l.min()
         self._lmax = self._l.max()
+        self.print_reference()
 
     def download(self):
         for i in ['old', 'new']:
@@ -562,6 +576,8 @@ class diel_jaeger98(diel_const):
         self._lk = np.log10(self._k)
         self._lmin = self._l.min()
         self._lmax = self._l.max()
+        self.reference = 'Jaeger et al. 1998'
+        self.print_reference()
 
 
 class diel_preibisch93(diel_const):
@@ -619,12 +635,18 @@ class diel_preibisch93(diel_const):
         self._lk = np.log10(self._k)
         self._lmin = self._l.min()
         self._lmax = self._l.max()
+        self.reference = 'Preibisch et al. 1993'
+        self.print_reference()
 
 
 class diel_pollack1994(diel_const):
     """
     Returns the DIGITIZED dielectric constants for the materials from
-    Pollack et al. 1994
+    Pollack et al. 1994.
+
+    **WARNING:** these are DIGITIZED from the paper and should only be used
+    for by-eye comparison. Other versions of these constants that should be
+    the original data can be found in `diel_henning`.
 
     [Pollack et al. 1994](https://dx.doi.org/10.1086/173677)
 
@@ -676,6 +698,8 @@ class diel_pollack1994(diel_const):
         self._lk = np.log10(self._k)
         self._lmin = self._l.min()
         self._lmax = self._l.max()
+        self.reference = 'Pollack et al. (1994)'
+        self.print_reference()
 
 
 class diel_draine2003(diel_const):
@@ -756,6 +780,9 @@ class diel_draine2003(diel_const):
         self._lmin = self._l.min()
         self._lmax = self._l.max()
 
+        self.reference = 'Draine 2003'
+        self.print_reference()
+
 
 class diel_WD2001_astrosil(diel_const):
     """
@@ -795,6 +822,9 @@ class diel_WD2001_astrosil(diel_const):
         self._lmin = self._l.min()
         self._lmax = self._l.max()
         self.rho = 3.5  # see sect 2.4
+
+        self.reference = 'Weingartner & Draine (2001)'
+        self.print_reference()
 
 
 class diel_drainelee84_astrosil(diel_const):
@@ -837,6 +867,9 @@ class diel_drainelee84_astrosil(diel_const):
         self._lmin = self._l.min()
         self._lmax = self._l.max()
         self.rho = 3.3  # DL84, page 102, 3rd paragraph
+
+        self.reference = 'Draine & Lee (1984)'
+        self.print_reference()
 
 
 class diel_vacuum(diel_const):
@@ -927,6 +960,9 @@ class diel_zubko96(diel_const):
         if extrapol:
             self.extrapolate_constants_up(lmin, lmax)
 
+        self.reference = 'Zubko et al. (1996)'
+        self.print_reference()
+
 
 class diel_warren84(diel_const):
     """
@@ -943,6 +979,7 @@ class diel_warren84(diel_const):
         # set the path and do some safety checks
         #
         self.material_str = 'Water Ice (Warren 1984)'
+        self.reference = 'Warren (1984)'
         #
         # set the file name
         #
@@ -968,6 +1005,8 @@ class diel_warren84(diel_const):
         self._lmax = self._l.max()
         self.rho = 0.917  # Warren 1984, page 1215
 
+        self.print_reference()
+
 
 class diel_warrenbrandt08(diel_const):
     """
@@ -987,6 +1026,7 @@ class diel_warrenbrandt08(diel_const):
         # set the path and do some safety checks
         #
         self.material_str = 'Water Ice (Warren & Brandt 2008)'
+        self.reference = 'Warren & Brandt (2008)'
         #
         # set the file name
         #
@@ -1011,6 +1051,8 @@ class diel_warrenbrandt08(diel_const):
         self._lmin = self._l.min()
         self._lmax = self._l.max()
         self.rho = 0.917  # Warren 1984, page 1215
+
+        self.print_reference()
 
 
 class diel_ricci10(diel_const):
@@ -1118,6 +1160,9 @@ class diel_ricci10(diel_const):
         self._lk = np.log10(self._k)
         self._lmin = self._l.min()
         self._lmax = self._l.max()
+
+        self.reference = 'Ricci et al. (2010)'
+        self.print_reference(', or the specific reference for that species')
 
 
 class diel_mixed():

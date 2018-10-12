@@ -1,11 +1,11 @@
-# Mie-Opacity Library
+# DSHARP Mie-Opacity Library
 
-This repository contains a module to carry out Mie opacity calculations based
-on a range of astrophysically relevant optical datasets and to calculate the
-default opacity tables used in the ALMA Large Program on Substructure in
-Protoplanetary Disks (PI: S. Andrews).
+This repository contains a module to carry out Mie opacity calculations based on
+a range of astrophysically relevant optical datasets and to calculate the
+default opacity tables used in the Disk Substructures at High Angular Resolution
+Project (DSHARP, PI: S. Andrews).
 
-This package was created by T. Birnstiel.
+This package was created by T. Birnstiel and C.P. Dullemond
 
 ## Installation
 
@@ -19,5 +19,12 @@ upon first use of that particular class.
 
 ## Test
 
-You can find a ipython notebook file under /tests that uses some of the
-functionality of this package.
+You can find ipython notebooks under [/tests](/tests) that use some of the
+functionality of this package as well as the IPython notebooks that were used to
+create the figures in Birnstiel et al. (2018).
+
+## Credit
+
+If you use this package, please cite Birnstiel et al. (2018).
+
+If you use any optical constants, please cite the appropriate experimental papers.
