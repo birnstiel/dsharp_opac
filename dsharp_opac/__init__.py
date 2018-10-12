@@ -10,7 +10,7 @@ except ImportError:
     def distribution(*args, **kwargs):
         raise ImportError('fortran size distribution code unavailable! Apparently it was not installed with f2py')
 
-from .lp_opac import \
+from .dsharp_opac import \
     progress_bar, \
     diel_const, \
     diel_from_lnk_file, \

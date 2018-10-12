@@ -1,10 +1,10 @@
 """
-Setup file for package `lp_opac`.
+Setup file for package `dsharp_opac`.
 """
 from numpy.distutils.core import Extension, setup
 import os
 
-PACKAGENAME = 'lp_opac'
+PACKAGENAME = 'dsharp_opac'
 
 
 setup(name=PACKAGENAME,
@@ -22,7 +22,7 @@ setup(name=PACKAGENAME,
       install_requires=['scipy', 'numpy', 'matplotlib'],
       zip_safe=False,
       ext_modules=[
-          Extension(name='lp_opac.bhmie_fortran', sources=['lp_opac/bhmie_fortran.f90']),
-          Extension(name='lp_opac.fit_module', sources=['lp_opac/fit_module.f90']),
+          Extension(name='dsharp_opac.bhmie_fortran', sources=['dsharp_opac/bhmie_fortran.f90']),
+          Extension(name='dsharp_opac.fit_module', sources=['dsharp_opac/fit_module.f90']),
           ],
       )
