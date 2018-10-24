@@ -3,4 +3,4 @@ dsharp_opac/bhmie_fortran.cpython*
 dsharp_opac/fit_module.cpython*
 build/
 dsharp_opac/__pycache__/
-tests/.ipynb_checkpoints
+.ipynb_checkpoints/
