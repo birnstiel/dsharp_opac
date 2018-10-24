@@ -7,6 +7,12 @@ Project (DSHARP, PI: S. Andrews).
 
 This package was created by T. Birnstiel and C.P. Dullemond
 
+## Credit
+
+If you use this package, please cite Birnstiel et al. (2018).
+
+If you use any optical constants, please cite the appropriate experimental papers.
+
 ## Installation
 
 got into the base directory (where this README.md is) and run
@@ -16,15 +22,7 @@ got into the base directory (where this README.md is) and run
 Note: some of the optical constants rely on data files that will be downloaded
 upon first use of that particular class.
 
+## Tests & Examples
 
-## Test
-
-You can find ipython notebooks under [/tests](/tests) that use some of the
-functionality of this package as well as the IPython notebooks that were used to
-create the figures in Birnstiel et al. (2018).
-
-## Credit
-
-If you use this package, please cite Birnstiel et al. (2018).
-
-If you use any optical constants, please cite the appropriate experimental papers.
+You can find some ipython notebooks under [/tests](/tests) that use some of the
+functionality of this package. The [notebooks folder](notebooks/index.ipynb) contains the IPython notebooks and data that were used to create the figures in Birnstiel et al. (2018).
