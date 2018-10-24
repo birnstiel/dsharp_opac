@@ -11,6 +11,14 @@ import os
 import sys
 import warnings
 import pkg_resources
+import astropy.constants as const
+
+au     = const.au.cgs.value
+M_sun  = const.M_sun.cgs.value
+k_b    = const.k_B.cgs.value
+m_p    = const.m_p.cgs.value
+G      = const.G.cgs.value
+sig_h2 = 2e-15  # cross section of H2 [cm^2]
 
 # next we need to define the bhmie function. By default we try to use the
 # fortran version which should be the fastest. Otherwise, we use a python
@@ -88,6 +96,13 @@ try:
         return S1, S2, Qext, Qabs, Qsca, Qback, gsca
 except ImportError:
     pass
+
+try:
+    from .fit_module import fit_module
+    distribution = fit_module.fit_function18_test
+except ImportError:
+    def distribution(*args, **kwargs):
+        raise ImportError('fortran size distribution code unavailable! Apparently it was not installed with f2py')
 
 
 def progress_bar(perc, text=''):
@@ -1373,6 +1388,180 @@ def gaussian_N_of_a(a, a_mean, sigma_a, rho_s):
     dist = np.exp(-(a - a_mean)**2 / (2 * sigma_a**2))
     dist = dist / np.trapz(dist * m, x=a)
     return dist
+
+
+def get_B11_fit(T, a, r=au, sigma_g=200., d2g=0.01, rho_s=1.6686, M_star=M_sun, v_frag=100., alpha=4e-4):
+    """
+    Wrapper for the steady-state size distribution fit of Birnstiel et al. 2011.
+
+    Arguments:
+    ----------
+
+    T : float
+        temperature in K
+
+    Keywords:
+    ---------
+
+    r : float
+        position in the disk in cm
+
+    sigma_g : float
+        gas surface density [g/cm^2]
+
+    d2g : float
+        dust-to-gas ratio
+
+    rho_s : float
+        material density [g/cm^3]
+
+    M_star : float
+        mass of the central star [g]
+
+    v_frag : float
+        fragmentation velocity [cm/s]
+
+    alpha : float
+        turbulence parameter
+    """
+    sigma_d = sigma_g * d2g
+
+    m = 4 * np.pi / 3 * rho_s * a**3  # mass grid
+
+    # create the size distribution
+
+    fit, a_01, a_12, a_l, a_p, a_r, a_sett = distribution(11 / 6., T, alpha, sigma_g, sigma_d, rho_s, m, a, M_star, r, v_frag)
+
+    return fit
+
+
+def get_B11S_fit(T, a, r=au, sigma_g=200., d2g=0.01, rho_s=1.6686, M_star=M_sun,
+                 v_frag=100., alpha=4e-4, mu=2.3, stokes_regime=False):
+    """
+    Creates the simplified version of the steady-state size distribution fit
+    from Birnstiel et al. 2019.
+
+    Arguments:
+    ----------
+
+    T : float
+        temperature in K
+
+    Keywords:
+    ---------
+
+    r : float
+        position in the disk in cm
+
+    sigma_g : float
+        gas surface density [g/cm^2]
+
+    d2g : float
+        dust-to-gas ratio
+
+    rho_s : float
+        material density [g/cm^3]
+
+    M_star : float
+        mass of the central star [g]
+
+    v_frag : float
+        fragmentation velocity [cm/s]
+
+    alpha : float
+        turbulence parameter
+
+    stokes_regime : bool
+        if true: include the first stokes drag regime when calculating sizes
+        if false: only calculate sizes in the Epstein regime
+    """
+    cs  = np.sqrt(k_b * T / (mu * m_p))              # sound speed
+    om  = np.sqrt(G * M_star / r**3)                 # keplerian frequency
+    H   = cs / om                                    # gas scale height
+    n   = sigma_g / (np.sqrt(2 * np.pi) * H * m_p)   # mid-plane number density
+    mfp = 0.5 / (sig_h2 * n)                         # mean free path
+    Re = alpha * sigma_g * sig_h2 / (2 * mu * m_p)   # particle reynolds number
+
+    # calculate the fragmentation barrier
+
+    b = 3. * alpha * cs**2 / v_frag**2
+    St_f  = 0.5 * (b - np.sqrt(b**2 - 4.))
+
+    # convert to particle size in Epstein and in Stokes regime
+
+    a_frag   = 2. * sigma_g / (np.pi * rho_s) * St_f  # Epstein
+    if stokes_regime:
+        a_fr_St1 = (9. * St_f * sigma_g * mfp / (2. * np.pi * rho_s))**0.5
+        a_frag = np.minimum(a_frag, a_fr_St1)
+
+    # if no fragmentation is happening: return NANs
+
+    if np.isnan(a_frag):
+        warnings.warn('Particles do not fragment, no size distribution returned')
+        return np.zeros_like(a) * np.nan, np.nan
+
+    # calculate the knee at roughly micron sizes, a_BT (Eq. 37 in B11)
+
+    a_bt = (
+        8. * sigma_g / (np.pi * rho_s) * Re**-0.25 *
+        np.sqrt(mu * m_p / (3 * np.pi * alpha)) *
+        (4 * np.pi / 3 * rho_s)**-0.5)**0.4
+
+    # calculate transition in turbulent velocities, Eq. 39 in B11
+
+    St_12    = Re**-0.5 * 0.625
+    a_12     = 2. * sigma_g / (np.pi * rho_s) * St_12
+    if stokes_regime:
+        a_12_St1 = (9. * St_12 * sigma_g * mfp / (2. * np.pi * rho_s))**0.5
+        a_12 = np.minimum(a_12, a_12_St1)
+
+    # calculate settling size
+
+    a_set     = 2. * sigma_g / (np.pi * rho_s) * alpha
+    if stokes_regime:
+        a_set_St1 = (9. * alpha * sigma_g * mfp / (2. * np.pi * rho_s))**0.5
+        a_set = np.minimum(a_set, a_set_St1)
+
+    # the distribution slopes for the three regimes
+    # with and without settling
+    slopes = np.array([[1.5, 0.25, 0.5], [1.25, 0.0, 0.25]])
+
+    # create the size distribution
+
+    regime_limits = sorted([a_bt, a_12, a_set, a_frag])
+    ia_prev = 0
+    sigma_d = np.zeros_like(a)
+    sigma_d[0] = 1.0
+    for a_regime in regime_limits:
+        ia_next = a.searchsorted(a_regime)
+        ia_next = min(ia_next, len(a) - 1)
+
+        # get the slope
+
+        i_s = int(a_regime > a_set)
+
+        if a_regime <= a_bt:
+            slope = slopes[i_s, 0]
+        elif a_regime <= a_12:
+            slope = slopes[i_s, 1]
+        else:
+            slope = slopes[i_s, 2]
+
+        # make the size distribution
+
+        sigma_d[ia_prev:ia_next + 1] = sigma_d[ia_prev] * (a[ia_prev:ia_next + 1] / a[ia_prev])**(slope - 1)
+
+        ia_prev = ia_next
+
+    # implement a floor value for all particles above fragmentation velocity
+
+    sigma_d[a >= a_frag] = 1e-100
+
+    # normalize as *distribution*
+
+    sigma_d = sigma_d / np.trapz(sigma_d, x=a) * sigma_g * d2g
+
+    return sigma_d, a_frag
 
 
 def get_kappa_from_q(a, m, q_abs, q_sca):

@@ -3,12 +3,6 @@ try:
     from .bhmie_fortran import bhmie_fortran
 except ImportError:
     print('fortran mie routines unavailable')
-try:
-    from .fit_module import fit_module
-    distribution = fit_module.fit_function18_test
-except ImportError:
-    def distribution(*args, **kwargs):
-        raise ImportError('fortran size distribution code unavailable! Apparently it was not installed with f2py')
 
 from .dsharp_opac import \
     progress_bar, \
@@ -40,7 +34,10 @@ from .dsharp_opac import \
     get_ricci_mix, \
     get_dsharp_mix, \
     get_opacities, \
-    size_average_opacity
+    size_average_opacity, \
+    distribution, \
+    get_B11_fit, \
+    get_B11S_fit
 
 __all__ = [
     'bhmie_python',
@@ -75,4 +72,6 @@ __all__ = [
     'get_dsharp_mix',
     'get_opacities',
     'size_average_opacity',
-    'distribution']
+    'distribution',
+    'get_B11_fit',
+    'get_B11S_fit']
