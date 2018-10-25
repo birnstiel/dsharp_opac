@@ -13,7 +13,7 @@ from .dsharp_opac import \
     diel_preibisch93, \
     diel_pollack1994, \
     diel_draine2003, \
-    diel_WD2001_astrosil, \
+    diel_WeingartnerDraine2001_astrosil, \
     diel_drainelee84_astrosil, \
     diel_vacuum, \
     diel_zubko96, \
@@ -50,7 +50,7 @@ __all__ = [
     'diel_preibisch93',
     'diel_pollack1994',
     'diel_draine2003',
-    'diel_WD2001_astrosil',
+    'diel_WeingartnerDraine2001_astrosil',
     'diel_drainelee84_astrosil',
     'diel_vacuum',
     'diel_zubko96',

@@ -142,7 +142,10 @@ def download(packagedir):
     """
     import json
     import os
+    import ssl
     from urllib.request import urlretrieve
+
+    ssl._create_default_https_context = ssl._create_unverified_context
 
     if not os.path.isdir(packagedir):
         packagedir = os.path.dirname(packagedir)
@@ -799,7 +802,7 @@ class diel_draine2003(diel_const):
         self.print_reference()
 
 
-class diel_WD2001_astrosil(diel_const):
+class diel_WeingartnerDraine2001_astrosil(diel_const):
     """
     Returns the dielectric constants for astronomical silicates from
     Weingartner & Draine 2001. The data comes from file `eps_suvSil`
