@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/137751482.svg)](https://zenodo.org/badge/latestdoi/137751482)
+
 # DSHARP Mie-Opacity Library
 
 This repository contains a module to carry out Mie opacity calculations based on
