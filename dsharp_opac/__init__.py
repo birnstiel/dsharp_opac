@@ -35,6 +35,7 @@ from .dsharp_opac import \
     get_dsharp_mix, \
     get_opacities, \
     size_average_opacity, \
+    get_smooth_opacities, \
     distribution, \
     get_B11_fit, \
     get_B11S_fit
@@ -62,6 +63,7 @@ __all__ = [
     'gaussian_N_of_a',
     'get_kappa_from_q',
     'get_size_averaged_opacity',
+    'get_smooth_opacities',
     'get_mie_coefficients',
     'calculate_mueller_matrix',
     'make_opacity_dict',

@@ -2243,13 +2243,12 @@ def get_ricci_mix(extrapol=False, lmax=None, rule='Bruggeman'):
     return diel_constants, rho_s
 
 
-def get_opacities(a, lam, rho_s=None, diel_const=None, bhmie_function=bhmie_function,
+def get_opacities(a, lam, rho_s, diel_const, bhmie_function=bhmie_function,
                   return_all=False, extrapol=False, n_angle=3,
                   extrapolate_large_grains=False):
     """
     Calculates opacities according to some specified method for
-    a given size- and wavelength grid. If diel_const and rho_s is not given,
-    default opacities are used. Otherwise both rho_s and diel_const are needed.
+    a given size- and wavelength grid.
 
     Arguments:
     ----------
@@ -2260,14 +2259,14 @@ def get_opacities(a, lam, rho_s=None, diel_const=None, bhmie_function=bhmie_func
     lam : array
         the wavelength grid in cm
 
-    Keywords:
-    ---------
-
     diel_const : dielectric constant
         in case other dielectric constants should be used
 
     rho_s : float
         material density of each size [g/cm^3]
+
+    Keywords:
+    ---------
 
     bhmie_function : callable
         which function to use for the mie calculation
@@ -2308,15 +2307,6 @@ def get_opacities(a, lam, rho_s=None, diel_const=None, bhmie_function=bhmie_func
         the wavelength grid in cm
 
     """
-    if (diel_const is None and rho_s is not None) or (diel_const is not None and rho_s is None):
-        raise AssertionError('diel_const and rho_s need to be both given or both be None')
-
-    if diel_const is None and rho_s is None:
-        if extrapol:
-            print('Note: wavelength range outside data. Extrapolation will be done but is uncertain.')
-        print('Note: no dielectric constants given, will use Ricci-2010-like optical constants')
-        diel_const, rho_s = get_ricci_mix(extrapol=extrapol, lmax=lam[-1])
-
     m = 4 * np.pi / 3. * rho_s * a**3
 
     package = get_mie_coefficients(
@@ -2463,3 +2453,116 @@ def size_average_opacity(lam_avg, a, lam, k_abs, k_sca, q=3.5, plot=False, ax=No
         ret['ax1'] = ax[0]
 
     return ret
+
+
+def get_smooth_opacities(a, lam, rho_s, diel_const, smoothing='linear', **kwargs):
+    """
+    Similar to `get_opacities`, but it calculates the opacities on a much finer
+    grid and then averages them back on the original grid.
+
+    Parameters
+    ----------
+    a : array
+        particle size grid in cm
+
+    lam : array
+        wavelength grid in cm
+
+    rho_s : float
+        material density in g/cm**3
+
+    diel_const : instance diel_const
+        dielectric constants object to use
+
+    Keywords:
+    ---------
+
+    smoothing : str
+        type of smoothing, see code. Either 'linear' or 'gaussian'.
+
+    all other keywords are passed to the call of `get_opacities`.
+
+    Returns
+    -------
+    dict:
+        dictionary like in get_opacities, but including extra information.
+    """
+
+    # number of finer grid points around each grid.
+
+    n_inter = 40
+
+    # for gaussian smoothing:
+    eps     = 0.1   # how far around each grid point the averaging-grid extends
+    sigma   = 0.05  # the width of the gaussian weights around a[i] (in terms of a[i])
+
+    if smoothing == 'linear':
+
+        # define a delta-a which tells us how much down and up we go around each grid point.
+        # the factor (n_inter - 1) / n_inter is to avoid overlapping intervals
+
+        da = np.diff(a) / 2. * (n_inter - 1) / n_inter
+        da = np.hstack((da[0], da))
+
+    elif smoothing == 'gaussian':
+
+        da = eps * np.diff(a)
+
+        # first grid point
+
+        a_left = a[0] * a[0] / a[1]  # calculate a[-1] grid point
+        da = np.hstack((eps * (a[0] - a_left), da))
+    else:
+        raise ValueError('smoothing must be \'gaussian\' or \'linear\'')
+
+    # make the fine linear particle size grid. All these *fine linear*
+    # calculations have the suffix `_h`.
+
+    a_h = np.array([])
+    for i in range(len(a)):
+        a_h = np.hstack((a_h, np.linspace(a[i] - da[i], a[i] + da[i], n_inter)))
+
+    # calculate the high res opacities
+
+    res_h = get_opacities(a_h, lam, rho_s, diel_const, **kwargs)
+
+    k_abs_h  = res_h['k_abs']
+    k_sca_h  = res_h['k_sca']
+    g_h      = res_h['g']
+
+    # create arrays to store the smoothed values
+
+    k_sca_avg_h = np.zeros((len(a), len(lam)))
+    k_abs_avg_h = np.zeros((len(a), len(lam)))
+    g_avg_h     = np.zeros((len(a), len(lam)))
+
+    # for each low-res grid point ...
+
+    for i in range(len(a)):
+
+        # ... find the exactly corresponding indices in high res
+        i0 = i * n_inter
+        i1 = (i + 1) * n_inter
+
+        # set the weights
+
+        if smoothing == 'linear':
+            w = np.ones(n_inter) / n_inter
+        elif smoothing == 'gaussian':
+            w = np.exp(-(a[i] - a_h[i0:i1])**2 / (2 * (sigma * a[i])**2))
+            w /= w.sum()
+
+        # average over this range
+
+        k_abs_avg_h[i, :] = (w[:, None] * k_abs_h[i0:i1, :]).sum(0)
+        k_sca_avg_h[i, :] = (w[:, None] * k_sca_h[i0:i1, :]).sum(0)
+        g_avg_h[i, :]     = (w[:, None] * g_h[i0:i1, :]).sum(0)
+
+    # store the results in the dictionary
+
+    res_h['k_abs_avg_h'] = k_abs_avg_h
+    res_h['k_sca_avg_h'] = k_sca_avg_h
+    res_h['g_avg_h'] = g_avg_h
+    res_h['a_h'] = a_h
+
+    return res_h
