@@ -2,4 +2,7 @@ include README.md
 include LICENSE
 include dsharp_opac/optical_constants/*/*
 include dsharp_opac/optical_constants/*/*/*
-include tests/opacity_package_tests.ipynb
+include notebooks/*.ipynb
+include notebooks/*.py
+include notebooks/*.npz
+include notebooks/data/*.+
