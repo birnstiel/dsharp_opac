@@ -1487,8 +1487,8 @@ def get_B11S_fit(T, a, r=au, sigma_g=200., d2g=0.01, rho_s=1.6686, M_star=M_sun,
 
     # calculate the fragmentation barrier
 
-    # the factor of 1.5 accounts for the tail of larger (faster) paraticles
-    b = 3. * alpha * cs**2 / v_frag**2 * 1.5
+    # the factor of 1.25 accounts for the tail of larger (faster) paraticles
+    b = 3. * alpha * cs**2 / v_frag**2 * 1.25
     St_f  = 0.5 * (b - np.sqrt(b**2 - 4.))
 
     # calculate the knee at roughly micron sizes, a_BT (Eq. 37 in B11)
