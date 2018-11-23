@@ -1,9 +1,14 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.widgets as w
+
+from scipy.optimize import fsolve
+
 import astropy.constants as c
+import astropy.units as u
+
 import aux_functions as aux
-import os
 import dsharp_opac as opacity
 
 try:
@@ -13,13 +18,37 @@ except ImportError:
     coala_installed = False
 
 
+def t_sat_water(Sigma, M_star, r, f_h2o=0.005):
+    """calculate water sublimation temperature
+
+    Using values from Leger et al. 1985.
+
+    """
+
+    torr = 101325. / 760. * (1. * u.Pa).cgs.value
+    muw  = 18.01528
+    mug  = 2.3
+    k_b  = c.k_B.cgs.value
+    m_p  = c.m_p.cgs.value
+    p_0  = 1.9e10 * torr
+    dH   = 6070.
+    om   = np.sqrt(c.G.cgs.value * M_star / r**3)
+
+    A = f_h2o * Sigma * om / p_0 * np.sqrt(k_b * mug / (2 * np.pi * muw**2 * m_p))
+
+    def fct(T):
+        return A * np.sqrt(T) - np.exp(-dH / T)
+
+    return fsolve(fct, 170)[0]
+
+
 aux.set_style()
 
 # ------------------------
 # GENERAL CALCULATION PART
 # ------------------------
 
-# load opacities
+# load default opacities
 
 d      = np.load('data/default_opacities_smooth.npz')
 a      = d['a']
@@ -28,6 +57,16 @@ lam    = d['lam']
 k_abs  = d['k_abs']
 k_sca  = d['k_sca']
 k_ext = k_abs + (1 - gsca) * k_sca
+
+# load dry opacities
+
+d_d      = np.load('data/icefree_opacities_smooth.npz')
+a_d      = d['a']
+gsca_d   = d['g'].T
+lam_d    = d['lam']
+k_abs_d  = d['k_abs']
+k_sca_d  = d['k_sca']
+k_ext_d = k_abs_d + (1 - gsca_d) * k_sca_d
 
 # get constants and calculate derived quantities
 
@@ -71,10 +110,16 @@ power_law = power_law / power_law.sum()
 # assuming T is the first parameter: calculate
 # the quantities for the power-law distribution
 
-k_P_p   = np.zeros([n_grid[0]])
-k_R_p   = np.zeros([n_grid[0]])
+k_P_pf   = np.zeros([n_grid[0]])
+k_R_pf   = np.zeros([n_grid[0]])
+
 k_abs_p = (k_abs * power_law[None, :]).sum(1)
 k_ext_p = (k_ext * power_law[None, :]).sum(1)
+
+# the dry ones
+
+k_abs_p_d = (k_abs_d * power_law[None, :]).sum(1)
+k_ext_p_d = (k_ext_d * power_law[None, :]).sum(1)
 
 for it, _T in enumerate(par_grid[0]):
     Bnu    = aux.planck_B_nu(nu, _T)
@@ -82,8 +127,12 @@ for it, _T in enumerate(par_grid[0]):
     B      = np.trapz(Bnu, x=nu)
     dBdT   = np.trapz(dBnudT, x=nu)
 
-    k_P_p[it]  = np.trapz(Bnu * k_abs_p, x=nu) / B
-    k_R_p[it]  = dBdT / np.trapz(dBnudT / k_ext_p, x=nu)
+    if _T < 170:
+        k_P_pf[it]  = np.trapz(Bnu * k_abs_p, x=nu) / B
+        k_R_pf[it]  = dBdT / np.trapz(dBnudT / k_ext_p, x=nu)
+    else:
+        k_P_pf[it]  = np.trapz(Bnu * k_abs_p_d, x=nu) / B
+        k_R_pf[it]  = dBdT / np.trapz(dBnudT / k_ext_p_d, x=nu)
 
 # --------------------
 # DEFINE DATA FUNCTION
@@ -101,22 +150,37 @@ def get_data(values):
         v_frag=v_frag, alpha=alpha)
     f1 = f1 / f1.sum()
 
-    # get the size distribution fit number 1
+    # get the size distribution fit number 2
 
     f2, amax = opacity.get_B11S_fit(
         T, a, r=r, sigma_g=sigma_g, d2g=d2g, rho_s=rho_s, M_star=M_star,
         v_frag=v_frag, alpha=alpha)
     f2 = (f2 * a) / (f2 * a).sum()
 
-    # sum the absorption opacity
+    if T < t_sat_water(sigma_g, M_star, r):
+        # sum the absorption opacity
 
-    k_abs_f1 = (k_abs * f1[None, :]).sum(1)
-    k_abs_f2 = (k_abs * f2[None, :]).sum(1)
+        k_abs_f1 = (k_abs * f1[None, :]).sum(1)
+        k_abs_f2 = (k_abs * f2[None, :]).sum(1)
+        k_abs_pl = (k_abs * power_law[None, :]).sum(1)
 
-    # sum the EXTINCTION opacity
+        # sum the EXTINCTION opacity
 
-    k_ext_f1 = (k_ext * f1[None, :]).sum(1)
-    k_ext_f2 = (k_ext * f2[None, :]).sum(1)
+        k_ext_f1 = (k_ext * f1[None, :]).sum(1)
+        k_ext_f2 = (k_ext * f2[None, :]).sum(1)
+        k_ext_pl = (k_ext * power_law[None, :]).sum(1)
+    else:
+        # sum the DRY absorption opacity
+
+        k_abs_f1 = (k_abs_d * f1[None, :]).sum(1)
+        k_abs_f2 = (k_abs_d * f2[None, :]).sum(1)
+        k_abs_pl = (k_abs_d * power_law[None, :]).sum(1)
+
+        # sum the DRY EXTINCTION opacity
+
+        k_ext_f1 = (k_ext_d * f1[None, :]).sum(1)
+        k_ext_f2 = (k_ext_d * f2[None, :]).sum(1)
+        k_ext_pl = (k_ext_d * power_law[None, :]).sum(1)
 
     # calculate Planck opacity for the fit and the power-law
 
@@ -126,12 +190,14 @@ def get_data(values):
 
     k_P_f1 = np.trapz(Bnu * k_abs_f1, x=nu) / B
     k_P_f2 = np.trapz(Bnu * k_abs_f2, x=nu) / B
+    k_P_pl = np.trapz(Bnu * k_abs_pl, x=nu) / B
 
     # calculate Rosseland opacity for the fit and the power-law
 
     dBdT   = np.trapz(dBnudT, x=nu)
     k_R_f1 = dBdT / np.trapz(dBnudT / k_ext_f1, x=nu)
     k_R_f2 = dBdT / np.trapz(dBnudT / k_ext_f2, x=nu)
+    k_R_pl = dBdT / np.trapz(dBnudT / k_ext_pl, x=nu)
 
     return {
         'f1': f1,
@@ -142,8 +208,10 @@ def get_data(values):
         'k_abs_f2': k_abs_f2,
         'k_P_f1': k_P_f1,
         'k_P_f2': k_P_f2,
+        'k_P_pl': k_P_pl,
         'k_R_f1': k_R_f1,
         'k_R_f2': k_R_f2,
+        'k_R_pl': k_R_pl,
         }
 
 
@@ -151,15 +219,19 @@ def get_data(values):
 # this takes quite a while if n_grid > 10, so we
 # store it and load it if if it's available
 
-fname = 'kPR1.npz'
+fname = 'kPR2.npz'
 if os.path.isfile(fname):
-    k_P_f1_array = np.load(fname)['k_P_f1_array']
-    k_R_f1_array = np.load(fname)['k_R_f1_array']
+    k_P_f2_array = np.load(fname)['k_P_f2_array']
+    k_R_f2_array = np.load(fname)['k_R_f2_array']
+    k_P_pl_array = np.load(fname)['k_P_pl_array']
+    k_R_pl_array = np.load(fname)['k_R_pl_array']
     amax_array   = np.load(fname)['amax_array']
     T_array      = np.load(fname)['T_array']
 else:
-    k_P_f1_array = np.zeros([len(p) for p in par_grid])
-    k_R_f1_array = np.zeros([len(p) for p in par_grid])
+    k_P_f2_array = np.zeros([len(p) for p in par_grid])
+    k_R_f2_array = np.zeros([len(p) for p in par_grid])
+    k_P_pl_array = np.zeros([len(p) for p in par_grid])
+    k_R_pl_array = np.zeros([len(p) for p in par_grid])
     amax_array   = np.zeros([len(p) for p in par_grid])
 
     for i1 in range(n_grid[0]):
@@ -173,29 +245,55 @@ else:
                         par_grid[3][i4],
                         ])
 
-                    k_R_f1_array[i1, i2, i3, i4] = res['k_R_f1']
-                    k_P_f1_array[i1, i2, i3, i4] = res['k_P_f1']
+                    k_R_f2_array[i1, i2, i3, i4] = res['k_R_f2']
+                    k_P_f2_array[i1, i2, i3, i4] = res['k_P_f2']
+                    k_R_pl_array[i1, i2, i3, i4] = res['k_R_pl']
+                    k_P_pl_array[i1, i2, i3, i4] = res['k_P_pl']
                     amax_array[i1, i2, i3, i4]   = res['amax']
 
     T_array = par_grid[0]
     np.savez_compressed(fname, **{
-        'k_P_f1_array': k_P_f1_array,
-        'k_R_f1_array': k_R_f1_array,
+        'k_P_f2_array': k_P_f2_array,
+        'k_R_f2_array': k_R_f2_array,
+        'k_P_pl_array': k_P_pl_array,
+        'k_R_pl_array': k_R_pl_array,
         'amax_array': amax_array,
         'T_array': T_array})
 
 # find the max & min values
 
-kP1min = k_P_f1_array.copy()
-kP1max = k_P_f1_array.copy()
-kR1min = k_R_f1_array.copy()
-kR1max = k_R_f1_array.copy()
-for i in range(n_params - 1):
-    kP1min = kP1min.min(-1)
-    kP1max = kP1max.max(-1)
+kP2min  = k_P_f2_array.copy()
+kP2max  = k_P_f2_array.copy()
 
-    kR1max = kR1max.max(-1)
-    kR1min = kR1min.min(-1)
+kR2min  = k_R_f2_array.copy()
+kR2max  = k_R_f2_array.copy()
+
+kPplmin  = k_P_pl_array.copy()
+kPplmax  = k_P_pl_array.copy()
+
+kRplmin  = k_R_pl_array.copy()
+kRplmax  = k_R_pl_array.copy()
+
+kP2min[np.isnan(kP2min)] = k_P_f2_array.max()
+kP2max[np.isnan(kP2max)] = k_P_f2_array.min()
+kR2min[np.isnan(kR2min)] = k_R_f2_array.max()
+kR2max[np.isnan(kR2max)] = k_R_f2_array.min()
+
+kPplmin[np.isnan(kPplmin)] = k_P_pl_array.max()
+kPplmax[np.isnan(kPplmax)] = k_P_pl_array.min()
+kRplmin[np.isnan(kRplmin)] = k_R_pl_array.max()
+kRplmax[np.isnan(kRplmax)] = k_R_pl_array.min()
+
+for i in range(n_params - 1):
+    kP2min = np.nanmin(kP2min, -1)
+    kP2max = np.nanmax(kP2max, -1)
+    kR2min = np.nanmin(kR2min, -1)
+    kR2max = np.nanmax(kR2max, -1)
+
+    kPplmin = np.nanmin(kPplmin, -1)
+    kPplmax = np.nanmax(kPplmax, -1)
+    kRplmin = np.nanmin(kRplmin, -1)
+    kRplmax = np.nanmax(kRplmax, -1)
 
 # -----------------
 # INITIALIZE FIGURE
@@ -216,18 +314,32 @@ fig, axs = plt.subplots(3, 1, figsize=(3.5, 3.5 * (3 + controlh) / 1.618), dpi=1
 axs = axs.flat
 fig.subplots_adjust(left=0.2, top=0.95, bottom=controltop + bmargin, wspace=0.0, hspace=0.35)
 
+# first axis: the size distributions
+
 axs[0].set_xlabel('particle size [cm]')
 axs[0].set_ylabel('$\sigma$ [g cm$^{-2}$]')
 axs[0].set_ylim(1e-4, 1e-1)
 
+# second axis: size-averaged opacities as fct of wavelength
+
 axs[1].set_xlabel('wavelength [cm]')
 axs[1].set_ylabel('$\kappa_\mathrm{abs}$ [cm$^2$/g]')
+
+# third axis: mean opacities as function of temperature
 
 axs[2].set_xlabel('$T$ [K]')
 axs[2].set_ylabel('$\kappa_\mathrm{R/P}$ [cm$^2$/g]')
 axs[2].set_ylim(1e-1, 1e4)
-axs[2].fill_between(T_array, kP1min, kP1max, facecolor='C0', alpha=0.5)
-axs[2].fill_between(T_array, kR1min, kR1max, facecolor='C1', alpha=0.5)
+
+# NOTE: some lines are just place holders and the actual data will be plotted
+# in the update function
+
+# plot the filled areas
+
+axs[2].fill_between(T_array, kP2min, kP2max, facecolor='C0', alpha=0.5)
+axs[2].fill_between(T_array, kR2min, kR2max, facecolor='C1', alpha=0.5)
+
+# plot the size distributions
 
 line11, = axs[0].loglog(a, power_law, label='power-law')
 line12, = axs[0].loglog(a, power_law, label='fit 1')
@@ -235,19 +347,24 @@ line13, = axs[0].loglog(a, power_law, label='fit 2')
 line14, = axs[0].loglog([], [], 'k--')
 leg1 = axs[0].legend(fontsize='xx-small')
 
+# plot the size-averaged opacities
+
 line21, = axs[1].loglog(lam, k_abs_p, label='power-law')
 line22, = axs[1].loglog(lam, k_abs_p, label='fit 1')
 line23, = axs[1].loglog(lam, k_abs_p, label='fit 2')
 leg2 = axs[1].legend(fontsize='xx-small')
 
-line31, = axs[2].loglog(par_grid[0], k_P_p, label='Planck')
-line32, = axs[2].loglog(par_grid[0], k_R_p, label='Rosseland')
+# fixed T_evap power-law mean opacities
+
+line31, = axs[2].loglog(par_grid[0], k_P_pf, label='Planck')
+line32, = axs[2].loglog(par_grid[0], k_R_pf, label='Rosseland')
+
 dummy2, = axs[2].loglog([], [], '-', c='k', label='power-law')
 dummy1, = axs[2].loglog([], [], '+', c='k', label='fit')
-line33, = axs[2].loglog(par_grid[0][0], k_P_p[0], '+', c=line31.get_color())
-line34, = axs[2].loglog(par_grid[0][0], k_P_p[0], '+', c=line31.get_color())
-line35, = axs[2].loglog(par_grid[0][0], k_R_p[0], '+', c=line32.get_color())
-line36, = axs[2].loglog(par_grid[0][0], k_R_p[0], '+', c=line32.get_color())
+line33, = axs[2].loglog(par_grid[0][0], k_P_pf[0], '+', c=line31.get_color())
+line34, = axs[2].loglog(par_grid[0][0], k_P_pf[0], '+', c=line31.get_color())
+line35, = axs[2].loglog(par_grid[0][0], k_R_pf[0], '+', c=line32.get_color())
+line36, = axs[2].loglog(par_grid[0][0], k_R_pf[0], '+', c=line32.get_color())
 leg3 = axs[2].legend(fontsize='xx-small')
 
 # ----------------

@@ -13,3 +13,6 @@ import dsharp_opac as opacity
 
 import aux_functions as aux
 aux.set_style()
+
+if not os.path.isdir('figures'):
+    os.mkdir('figures')

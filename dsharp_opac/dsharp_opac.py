@@ -1487,21 +1487,9 @@ def get_B11S_fit(T, a, r=au, sigma_g=200., d2g=0.01, rho_s=1.6686, M_star=M_sun,
 
     # calculate the fragmentation barrier
 
-    b = 3. * alpha * cs**2 / v_frag**2
+    # the factor of 1.5 accounts for the tail of larger (faster) paraticles
+    b = 3. * alpha * cs**2 / v_frag**2 * 1.5
     St_f  = 0.5 * (b - np.sqrt(b**2 - 4.))
-
-    # convert to particle size in Epstein and in Stokes regime
-
-    a_frag   = 2. * sigma_g / (np.pi * rho_s) * St_f  # Epstein
-    if stokes_regime:
-        a_fr_St1 = (9. * St_f * sigma_g * mfp / (2. * np.pi * rho_s))**0.5
-        a_frag = np.minimum(a_frag, a_fr_St1)
-
-    # if no fragmentation is happening: return NANs
-
-    if np.isnan(a_frag):
-        warnings.warn('Particles do not fragment, no size distribution returned')
-        return np.zeros_like(a) * np.nan, np.nan
 
     # calculate the knee at roughly micron sizes, a_BT (Eq. 37 in B11)
 
@@ -1517,6 +1505,24 @@ def get_B11S_fit(T, a, r=au, sigma_g=200., d2g=0.01, rho_s=1.6686, M_star=M_sun,
     if stokes_regime:
         a_12_St1 = (9. * St_12 * sigma_g * mfp / (2. * np.pi * rho_s))**0.5
         a_12 = np.minimum(a_12, a_12_St1)
+
+    # special case
+
+    if St_f < St_12:
+        St_f = Re**-0.25 * v_frag / (cs * np.sqrt(1.5 * alpha))
+
+    # convert to particle size in Epstein and in Stokes regime
+
+    a_frag = 2. * sigma_g / (np.pi * rho_s) * St_f  # Epstein
+    if stokes_regime:
+        a_fr_St1 = (9. * St_f * sigma_g * mfp / (2. * np.pi * rho_s))**0.5
+        a_frag = np.minimum(a_frag, a_fr_St1)
+
+    # if no fragmentation is happening: return NANs
+
+    if np.isnan(a_frag) or a_frag > a[-1] or a_frag < a[0]:
+        warnings.warn('Fragmentation size outside grid, no size distribution returned')
+        return np.zeros_like(a) * np.nan, np.nan
 
     # calculate settling size
 
