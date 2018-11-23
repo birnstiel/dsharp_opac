@@ -22,23 +22,31 @@ aux.set_style()
 
 # load default opacities
 
-d      = np.load('data/default_opacities_smooth.npz')
-a      = d['a']
-gsca   = d['g'].T
-lam    = d['lam']
-k_abs  = d['k_abs']
-k_sca  = d['k_sca']
-k_ext = k_abs + (1 - gsca) * k_sca
+with np.load('data/default_opacities_smooth.npz') as d:
+    a_w     = d['a']
+    gsca_w  = d['g']
+    lam_w   = d['lam']
+    k_abs_w = d['k_abs']
+    k_sca_w = d['k_sca']
+    k_ext_w = k_abs_w + (1 - gsca_w) * k_sca_w
 
 # load dry opacities
 
-d_d      = np.load('data/icefree_opacities_smooth.npz')
-a_d      = d['a']
-gsca_d   = d['g'].T
-lam_d    = d['lam']
-k_abs_d  = d['k_abs']
-k_sca_d  = d['k_sca']
-k_ext_d = k_abs_d + (1 - gsca_d) * k_sca_d
+with np.load('data/icefree_opacities_smooth.npz') as d:
+    a_d      = d['a']
+    gsca_d   = d['g']
+    lam_d    = d['lam']
+    k_abs_d  = d['k_abs']
+    k_sca_d  = d['k_sca']
+    k_ext_d = k_abs_d + (1 - gsca_d) * k_sca_d
+
+# sanity check
+
+if np.allclose(lam_w, lam_d) and np.allclose(a_w, a_d):
+    lam = lam_w
+    a = a_w
+else:
+    raise ValueError('grids of the opacities do not match')
 
 # get constants and calculate derived quantities
 
@@ -85,8 +93,8 @@ power_law = power_law / power_law.sum()
 k_P_pf   = np.zeros([n_grid[0]])
 k_R_pf   = np.zeros([n_grid[0]])
 
-k_abs_p = (k_abs * power_law[None, :]).sum(1)
-k_ext_p = (k_ext * power_law[None, :]).sum(1)
+k_abs_p_w = (k_abs_w * power_law[None, :]).sum(1)
+k_ext_p_w = (k_ext_w * power_law[None, :]).sum(1)
 
 # the dry ones
 
@@ -100,8 +108,8 @@ for it, _T in enumerate(par_grid[0]):
     dBdT   = np.trapz(dBnudT, x=nu)
 
     if _T < 170:
-        k_P_pf[it]  = np.trapz(Bnu * k_abs_p, x=nu) / B
-        k_R_pf[it]  = dBdT / np.trapz(dBnudT / k_ext_p, x=nu)
+        k_P_pf[it]  = np.trapz(Bnu * k_abs_p_w, x=nu) / B
+        k_R_pf[it]  = dBdT / np.trapz(dBnudT / k_ext_p_w, x=nu)
     else:
         k_P_pf[it]  = np.trapz(Bnu * k_abs_p_d, x=nu) / B
         k_R_pf[it]  = dBdT / np.trapz(dBnudT / k_ext_p_d, x=nu)
@@ -129,18 +137,18 @@ def get_data(values):
         v_frag=v_frag, alpha=alpha)
     f2 = (f2 * a) / (f2 * a).sum()
 
-    if T < t_sat_water(sigma_g, M_star, r):
+    if T < aux.t_sat_water(sigma_g, M_star, r):
         # sum the absorption opacity
 
-        k_abs_f1 = (k_abs * f1[None, :]).sum(1)
-        k_abs_f2 = (k_abs * f2[None, :]).sum(1)
-        k_abs_pl = (k_abs * power_law[None, :]).sum(1)
+        k_abs_f1 = (k_abs_w * f1[None, :]).sum(1)
+        k_abs_f2 = (k_abs_w * f2[None, :]).sum(1)
+        k_abs_pl = (k_abs_w * power_law[None, :]).sum(1)
 
         # sum the EXTINCTION opacity
 
-        k_ext_f1 = (k_ext * f1[None, :]).sum(1)
-        k_ext_f2 = (k_ext * f2[None, :]).sum(1)
-        k_ext_pl = (k_ext * power_law[None, :]).sum(1)
+        k_ext_f1 = (k_ext_w * f1[None, :]).sum(1)
+        k_ext_f2 = (k_ext_w * f2[None, :]).sum(1)
+        k_ext_pl = (k_ext_w * power_law[None, :]).sum(1)
     else:
         # sum the DRY absorption opacity
 
@@ -321,9 +329,9 @@ leg1 = axs[0].legend(fontsize='xx-small')
 
 # plot the size-averaged opacities
 
-line21, = axs[1].loglog(lam, k_abs_p, label='power-law')
-line22, = axs[1].loglog(lam, k_abs_p, label='fit 1')
-line23, = axs[1].loglog(lam, k_abs_p, label='fit 2')
+line21, = axs[1].loglog(lam, k_abs_p_w, label='power-law')
+line22, = axs[1].loglog(lam, k_abs_p_w, label='fit 1')
+line23, = axs[1].loglog(lam, k_abs_p_w, label='fit 2')
 leg2 = axs[1].legend(fontsize='xx-small')
 
 # fixed T_evap power-law mean opacities
