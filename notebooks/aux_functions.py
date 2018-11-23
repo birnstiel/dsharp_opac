@@ -172,3 +172,45 @@ def permutate_fiducial(params):
                 param_sets[k, i] = value
                 k += 1
     return param_sets
+
+
+def t_sat_water(Sigma, M_star, r, f_h2o=0.005):
+    """Calculate water sublimation temperature using values from Leger et al. 1985.
+
+    Parameters
+    ----------
+    Sigma : float
+        total gas surface density [g/cm^2]
+
+    M_star : float
+        stellar mass [g]
+
+    r : float
+        radius [au]
+
+    f_h2o : float
+        water abundance
+
+    Returns
+    -------
+    float
+        sublimation temperature
+
+    """
+    from scipy.optimize import fsolve
+    
+    torr = 101325. / 760. * (1. * u.Pa).cgs.value
+    muw  = 18.01528
+    mug  = 2.3
+    k_b  = c.k_B.cgs.value
+    m_p  = c.m_p.cgs.value
+    p_0  = 1.9e10 * torr
+    dH   = 6070.
+    om   = np.sqrt(c.G.cgs.value * M_star / r**3)
+
+    A = f_h2o * Sigma * om / p_0 * np.sqrt(k_b * mug / (2 * np.pi * muw**2 * m_p))
+
+    def fct(T):
+        return A * np.sqrt(T) - np.exp(-dH / T)
+
+    return fsolve(fct, 170)[0]

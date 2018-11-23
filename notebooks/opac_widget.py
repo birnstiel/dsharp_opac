@@ -3,10 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.widgets as w
 
-from scipy.optimize import fsolve
-
 import astropy.constants as c
-import astropy.units as u
 
 import aux_functions as aux
 import dsharp_opac as opacity
@@ -16,31 +13,6 @@ try:
     coala_installed = True
 except ImportError:
     coala_installed = False
-
-
-def t_sat_water(Sigma, M_star, r, f_h2o=0.005):
-    """calculate water sublimation temperature
-
-    Using values from Leger et al. 1985.
-
-    """
-
-    torr = 101325. / 760. * (1. * u.Pa).cgs.value
-    muw  = 18.01528
-    mug  = 2.3
-    k_b  = c.k_B.cgs.value
-    m_p  = c.m_p.cgs.value
-    p_0  = 1.9e10 * torr
-    dH   = 6070.
-    om   = np.sqrt(c.G.cgs.value * M_star / r**3)
-
-    A = f_h2o * Sigma * om / p_0 * np.sqrt(k_b * mug / (2 * np.pi * muw**2 * m_p))
-
-    def fct(T):
-        return A * np.sqrt(T) - np.exp(-dH / T)
-
-    return fsolve(fct, 170)[0]
-
 
 aux.set_style()
 
