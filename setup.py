@@ -9,16 +9,15 @@ PACKAGENAME = 'dsharp_opac'
 
 setup(name=PACKAGENAME,
       description='python routines to calculate mie opacities',
-      version='0.0.5',
+      version='1.0.0',
       long_description=open(os.path.join(
           os.path.dirname(__file__), 'README.md')).read(),
-      url='https://github.com/seanandrews/p484',
-      author='LP',
+      url='https://github.com/birnstiel/dsharp_opac',
+      author='Til Birnstiel',
       author_email='til.birnstiel@lmu.de',
       license='GPLv3',
       packages=[PACKAGENAME],
       include_package_data=True,
-      package_data={PACKAGENAME: ['optical_constants/*/*', 'optical_constants/*/*/*']},
       install_requires=['scipy', 'numpy', 'matplotlib'],
       zip_safe=False,
       ext_modules=[
