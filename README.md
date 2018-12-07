@@ -7,24 +7,26 @@ a range of astrophysically relevant optical datasets and to calculate the
 default opacity tables used in the Disk Substructures at High Angular Resolution
 Project (DSHARP, PI: S. Andrews).
 
-This package was created by T. Birnstiel and C.P. Dullemond
+This package was created by T. Birnstiel and C.P. Dullemond.
 
 ## Credit
 
 If you use this package, please cite Birnstiel et al. (2018).
 
-If you use any optical constants, please cite the appropriate experimental papers.
+If you use any optical constants, please cite the appropriate experimental papers. The reference will be displayed upon import of the constants and is also available as the
 
 ## Installation
 
-got into the base directory (where this README.md is) and run
+- From source: got into the base directory (where this `README.md` is) and run
 
-    pip install .
+        pip install .
+
+
+        pip install dsharp_opac
 
 Note: some of the optical constants rely on data files that will be downloaded
 upon first use of that particular class.
 
 ## Tests & Examples
 
-You can find some ipython notebooks under [/tests](/tests) that use some of the
-functionality of this package. The [notebooks folder](notebooks/index.ipynb) contains the IPython notebooks and data that were used to create the figures in Birnstiel et al. (2018).
+You can find some jupyter notebooks in the [notebooks folder](notebooks/index.ipynb) that demonstrate some of the functionality of this package. It also contains the notebooks and data that were used to create the figures in Birnstiel et al. (2018).
