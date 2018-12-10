@@ -15,7 +15,7 @@ if __name__ == "__main__":
     from numpy.distutils.core import setup
     setup(name=PACKAGENAME,
           description='python routines to calculate mie opacities',
-          version='1.1.1rc0',
+          version='1.1.1rc3',
           long_description=(HERE / "README.md").read_text(),
           long_description_content_type='text/markdown',
           url='https://github.com/birnstiel/dsharp_opac',
@@ -23,8 +23,10 @@ if __name__ == "__main__":
           author_email='til.birnstiel@lmu.de',
           license='GPLv3',
           packages=[PACKAGENAME],
+          package_dir={PACKAGENAME: 'dsharp_opac'},
+          package_data={PACKAGENAME: ['optical_constants/*/*.*', 'optical_constants/*/*/*.*']},
           include_package_data=True,
-          install_requires=['scipy', 'numpy', 'matplotlib'],
+          install_requires=['scipy', 'numpy', 'matplotlib', 'astropy'],
           zip_safe=False,
           ext_modules=[
               Extension(name='dsharp_opac.bhmie_fortran', sources=['dsharp_opac/bhmie_fortran.f90']),

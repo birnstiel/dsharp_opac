@@ -17,10 +17,13 @@ If you use any optical constants, please cite the appropriate experimental paper
 
 ## Installation
 
-- From source: got into the base directory (where this `README.md` is) and run
+- From [source](https://github.com/birnstiel/dsharp_opac/archive/master.zip): go into the base directory (where this `README.md` is) and run
 
         pip install .
 
+    Should you work on the sources, e.g. for including new optical constants or new mehtods, then we recommend linking the installation to the source folder. Changes to the sources will then be reflected upon `import dsharp_opac` without the need to reinstall the package.
+
+- Coming soon: from [pypi.org](pypi.org):
 
         pip install dsharp_opac
 
