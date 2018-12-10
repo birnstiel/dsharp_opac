@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import urllib
+from astropy import constants as c
 
 #from disklab import opacity
 import dsharp_opac as opacity
