@@ -141,7 +141,6 @@ def download(packagedir):
     a json file `links.json` in `packagedir`.
     """
     import json
-    import os
     import ssl
     from urllib.request import urlretrieve
 
@@ -496,7 +495,6 @@ class diel_henning(diel_const):
             'olivine': 3.49,
             'olivinenewk': 3.20,
             'olmg60k': 3.59,
-            'orthopyr': 3.40,
             'pyrmg100k': 3.20,
             'pyrmg60k': 3.42,
             'orthopyr': 3.40,
@@ -534,6 +532,7 @@ class diel_henning(diel_const):
         self._lmax = self._l.max()
         self.print_reference()
 
+    @classmethod
     def download(self):
         for i in ['old', 'new']:
             path = pkg_resources.resource_filename(__name__, os.path.join('optical_constants', 'henning', i))
@@ -569,7 +568,8 @@ class diel_jaeger98(diel_const):
         #
         temps = [400, 600, 800, 1000]
         rhos  = [1.435, 1.670, 1.843, 1.988]
-        assert T in temps, "invalid temperature, use {}".format(temps)
+        if T not in temps:
+            raise AssertionError("invalid temperature, use {}".format(temps))
         self.material_str = 'Carbonaceous dust, T={} C (Jaeger et al. 1998)'.format(T)
         self.rho = rhos[temps.index(T)]
 
@@ -625,7 +625,8 @@ class diel_preibisch93(diel_const):
         #
         species = species.lower()
         options = ['dirty ice', 'amorphous carbon']
-        assert species in options, "unknown species, use one of {}".format(options)
+        if species not in options:
+            raise AssertionError("unknown species, use one of {}".format(options))
         self.material_str = '{}, (Preibisch et al. 1993)'.format(species.capitalize())
 
         if species == 'dirty ice':
@@ -693,7 +694,8 @@ class diel_pollack1994(diel_const):
         #
         species = species.lower()
         options = ['water ice', 'troilite', 'organics', 'olivine', 'iron', 'orthopyroxene']
-        assert species in options, "unknown species, use one of {}".format(options)
+        if species not in options:
+            raise AssertionError("unknown species, use one of {}".format(options))
         self.material_str = '{}, (Pollack et al. 1994)'.format(species.capitalize())
 
         fname = 'P94-{}.lnk'.format(species.replace(' ', ''))
@@ -756,7 +758,8 @@ class diel_draine2003(diel_const):
         Overwrite the initialization of the parent class
         """
         options = ['astrosilicates', 'graphite']
-        assert species.lower() in options, 'unknown species, use one of {}'.format(options)
+        if species.lower() not in options:
+            raise AssertionError('unknown species, use one of {}'.format(options))
         #
         # open file, read header and data
         #
@@ -766,8 +769,10 @@ class diel_draine2003(diel_const):
             self.rho = 3.3  # laor & draine 93
 
         elif species.lower() == 'graphite':
-            assert 'parallel' in kwargs, 'bool keyword \'parallel\' needed for graphite grains'
-            assert 'a' in kwargs, 'str keyword \'a\' needed for graphite grains'
+            if 'parallel' not in kwargs:
+                raise AssertionError('bool keyword \'parallel\' needed for graphite grains')
+            if 'a' not in kwargs:
+                raise AssertionError('str keyword \'a\' needed for graphite grains')
             parallel = kwargs.pop('parallel')
             a = kwargs.pop('a')
             self.material_str = 'Graphite, {}, a={} mu (Laor & Draine 1993)'.format(parallel * 'pa' + (not parallel) * 'pe', a)
@@ -1143,21 +1148,21 @@ class diel_ricci10(diel_const):
             le = np.logspace(np.log10(l[-1]), np.log10(lmax), 10)
             from scipy.optimize import curve_fit
 
-            def f(x, a, b, c):
+            def fct(x, a, b, c):
                 return a + b * x + c * x**2
 
             i_min = abs(l - 1e-1).argmin()
             #
             # extrapolate n
             #
-            res = curve_fit(f, np.log10(l[i_min:]), np.log10(n[i_min:]), [np.log10(n[-1]), 1, 0])
-            ne = 10.**f(np.log10(le), *res[0])
+            res = curve_fit(fct, np.log10(l[i_min:]), np.log10(n[i_min:]), [np.log10(n[-1]), 1, 0])
+            ne = 10.**fct(np.log10(le), *res[0])
             n = np.append(n, ne)
             #
             # extrapolate k
             #
-            res = curve_fit(f, np.log10(l[i_min:]), np.log10(k[i_min:]), [np.log10(k[-1]), 1, 0])
-            ke = 10.**f(np.log10(le), *res[0])
+            res = curve_fit(fct, np.log10(l[i_min:]), np.log10(k[i_min:]), [np.log10(k[-1]), 1, 0])
+            ke = 10.**fct(np.log10(le), *res[0])
             k = np.append(k, ke)
             l = np.append(l, le) # noqa
             #
@@ -1433,7 +1438,8 @@ def get_B11_fit(T, a, r=au, sigma_g=200., d2g=0.01, rho_s=1.6686, M_star=M_sun, 
 
     # create the size distribution
 
-    fit, a_01, a_12, a_l, a_p, a_r, a_sett = distribution(11 / 6., T, alpha, sigma_g, sigma_d, rho_s, m, a, M_star, r, v_frag)
+    res = distribution(11 / 6., T, alpha, sigma_g, sigma_d, rho_s, m, a, M_star, r, v_frag)
+    fit = res[0]
 
     return fit
 
@@ -1494,9 +1500,7 @@ def get_B11S_fit(T, a, r=au, sigma_g=200., d2g=0.01, rho_s=1.6686, M_star=M_sun,
     # calculate the knee at roughly micron sizes, a_BT (Eq. 37 in B11)
 
     a_bt = (
-        8. * sigma_g / (np.pi * rho_s) * Re**-0.25 *
-        np.sqrt(mu * m_p / (3 * np.pi * alpha)) *
-        (4 * np.pi / 3 * rho_s)**-0.5)**0.4
+        8. * sigma_g / (np.pi * rho_s) * Re**-0.25 * np.sqrt(mu * m_p / (3 * np.pi * alpha)) * (4 * np.pi / 3 * rho_s)**-0.5)**0.4
 
     # calculate transition in turbulent velocities, Eq. 39 in B11
 
@@ -1644,8 +1648,6 @@ def get_size_averaged_opacity(a, lam, n, rho_s, diel_const=None, q_abs=None,
         the opacity at each wavelength averaged over the size
         distribution and normalized per 1 g of dust.
     """
-    assert (diel_const is not None), "diel_const needs to be "
-
     if (q_abs is None or q_sca is None) and (k_abs is None or k_sca is None) \
             and (diel_const is None):
         raise AssertionError('Either (diel_const) or (q_abs, q_sca) or (k_abs, k_sca) needed as input')
@@ -1789,7 +1791,7 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function,
         # loop through the sizes that converge
         #
         for ia, x in enumerate(X_cut):
-            S1, S2, Qext, Qabs, Qsca, Qback, gsca = bhmie_function(x, complex(n, k), nang)
+            S1, S2, _, Qabs, Qsca, Qback, gsca = bhmie_function(x, complex(n, k), nang)
             q_abs[ia, ilam] = Qabs
             q_sca[ia, ilam] = Qsca
             g_sca[ia, ilam] = gsca.real
@@ -1891,7 +1893,7 @@ def make_opacity_dict(lam, a, k_abs, k_sca, g_sca, rho_s, zscat=None):
     return package
 
 
-def write_disklab_opacity(fname, opac_dict, dir='.'):
+def write_disklab_opacity(fname, opac_dict, path='.'):
     """
     Write the output of a Mie opacity calculation to a file. Minimum requirement
     is particle size and wavelength grid along with the according absorption and
@@ -1923,14 +1925,18 @@ def write_disklab_opacity(fname, opac_dict, dir='.'):
     Keywords:
     ---------
 
-    dir : str
+    path : str
         path where to store the file, defaults to current directory
     """
 
-    assert 'a' in opac_dict, 'opacity dictionary needs to contain particle size array \'a\''
-    assert 'lam' in opac_dict, 'opacity dictionary needs to contain wave length array \'lam\''
-    assert 'k_abs' in opac_dict, 'opacity dictionary needs to contain absortpion opacity array \'k_abs\''
-    assert 'k_sca' in opac_dict, 'opacity dictionary needs to contain scattering opacity array \'k_sca\''
+    if 'a' not in opac_dict:
+        raise AssertionError('opacity dictionary needs to contain particle size array \'a\'')
+    if 'lam' not in opac_dict:
+        raise AssertionError('opacity dictionary needs to contain wave length array \'lam\'')
+    if 'k_abs' not in opac_dict:
+        raise AssertionError('opacity dictionary needs to contain absortpion opacity array \'k_abs\'')
+    if 'k_sca' not in opac_dict:
+        raise AssertionError('opacity dictionary needs to contain scattering opacity array \'k_sca\'')
 
     # build a dict that contains only the data we need
 
@@ -1946,10 +1952,10 @@ def write_disklab_opacity(fname, opac_dict, dir='.'):
     if 'info' in opac_dict:
         dictionary['info'] = opac_dict['info']
 
-    np.savez_compressed(os.path.join(dir, fname), **dictionary)
+    np.savez_compressed(os.path.join(path, fname), **dictionary)
 
 
-def write_radmc3d_scatmat_file(index, opacity_dict, name, dir='.'):
+def write_radmc3d_scatmat_file(index, opacity_dict, name, path='.'):
     """
     The RADMC-3D radiative transfer package[1] can perform dust continuum
     radiative transfer for diagnostic purposes. It is designed for astronomical
@@ -1989,6 +1995,12 @@ def write_radmc3d_scatmat_file(index, opacity_dict, name, dir='.'):
         zscat : array
             scattering Mueller matrix elements
             size = len(a), len(lam), len(theta), 6
+
+    name : str
+        name to be used as species name, will be part of the file name
+
+    path : str
+        the directory where the output file will be saved
 
 
     References:
@@ -2070,7 +2082,7 @@ def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False, ax=None, twoaxes
     lam = np.logspace(np.log10(lmin), np.log10(lmax), nlam)
 
     if ax is None:
-        f, ax = plt.subplots()
+        ax = plt.subplots()[1]
 
     if isinstance(ax, (list, np.ndarray)):
         ax1 = ax[0]
@@ -2085,7 +2097,7 @@ def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False, ax=None, twoaxes
 
     lines = []
 
-    for n, c in enumerate(constants):
+    for c in constants:
         nk = np.zeros([len(lam), 2])
 
         if orig_data and (c._n is not None) and (c._l is not None):
@@ -2187,11 +2199,7 @@ def get_dsharp_mix(fm_ice=0.2, rule='Bruggeman'):
     print('| material'.ljust(length + 2) + '| volume fractions | mass fractions |')
     print('|' + (length + 1) * '-' + '|' + 18 * '-' + '|' + 16 * '-' + '|')
     for c, fv, fm in zip(constants, f_vol, f_mass):
-        print(
-            '| ' +
-            c.material_str.ljust(length) +
-            '| {:.4}'.format(fv).ljust(19) +
-            '| {:.4}'.format(fm).ljust(17) + '|')
+        print('| ' + c.material_str.ljust(length) + '| {:.4}'.format(fv).ljust(19) + '| {:.4}'.format(fm).ljust(17) + '|')
 
     # mix the optical constants using the Bruggeman rule
 
@@ -2427,10 +2435,10 @@ def size_average_opacity(lam_avg, a, lam, k_abs, k_sca, q=3.5, plot=False, ax=No
             f, ax = plt.subplots()
         ax = np.array(ax, ndmin=1)
         lines = []
-        lines += ax[0].loglog(a, ka[0, :], '-', label='absorption, $\lambda = {:2.2g}$ mm'.format(lam_avg[0] * 10))
-        lines += ax[0].loglog(a, ks[0, :], '--', label='scattering, $\lambda = {:2.2g}$ mm'.format(lam_avg[0] * 10))
-        ax[0].set_xlabel('$a_\mathrm{max}$ [cm]')
-        ax[0].set_ylabel('$\kappa$ [cm$^2$/g]')
+        lines += ax[0].loglog(a, ka[0, :], '-', label=r'absorption, $\lambda = {:2.2g}$ mm'.format(lam_avg[0] * 10))
+        lines += ax[0].loglog(a, ks[0, :], '--', label=r'scattering, $\lambda = {:2.2g}$ mm'.format(lam_avg[0] * 10))
+        ax[0].set_xlabel(r'$a_\mathrm{max}$ [cm]')
+        ax[0].set_ylabel(r'$\kappa$ [cm$^2$/g]')
         ax[0].set_xlim(1e-4, 1e2)
         ax[0].set_ylim(0.01, 50)
 
@@ -2439,7 +2447,7 @@ def size_average_opacity(lam_avg, a, lam, k_abs, k_sca, q=3.5, plot=False, ax=No
         if calc_beta:
             if len(ax) == 2:
                 ax2 = ax[1]
-                ax2.set_xlabel('$a_\mathrm{max}$ [cm]')
+                ax2.set_xlabel(r'$a_\mathrm{max}$ [cm]')
                 one_leg = False
             else:
                 ax2 = plt.twinx(ax[0])
