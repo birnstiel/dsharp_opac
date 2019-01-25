@@ -252,6 +252,23 @@ class diel_const(object):
         """
         Extend the data by log-extrapolation to longer wavelengths. Will start
         fitting for extrapolation at lmin and then extend the data up to lmax.
+
+        Arguments:
+        ----------
+
+        lmin, lmax : float
+            extrapolate from lmin, up to lmax
+
+        Keywords:
+        ---------
+
+        n : int
+            how many points to add in the extrapolation range
+
+        kind : str
+            how to extrapolate, choices are
+            - 'constant': keep the value constant
+            - 'first', 'second': do a first or second order extrapolation
         """
         #
         # extrapolate
@@ -285,7 +302,7 @@ class diel_const(object):
             p0_k = [np.log10(self._k[-1]), 1]
 
         else:
-            raise ValueError('`kind` must be `first` or `second`')
+            raise ValueError('unknown extrapolation method')
 
         if kind != 'constant':
             i_min = abs(self._l - lmin).argmin()
@@ -1114,7 +1131,7 @@ class diel_ricci10(diel_const):
         #
         # set the path and do some safety checks
         #
-        self.material_str = ('Lucas ' + species).replace('ice', 'water ice')
+        self.material_str = ('Ricci et al. 2010, ' + species).replace('ice', 'water ice')
         self.extrapol = extrapol
         #
         # set the file name
@@ -2246,7 +2263,7 @@ def get_ricci_mix(extrapol=False, lmax=None, rule='Bruggeman'):
 
     constants = [c0, c1, c2, c3]
 
-    # after Lucas thesis, the fractions in Ricci+2010 are typos
+    # after Luca Riccis thesis, the fractions in Ricci+2010 are typos
 
     vol_fract = [0.30, 0.07, 0.21, 0.42]
     densities = [0.00, 3.50, 2.50, 1.00]
