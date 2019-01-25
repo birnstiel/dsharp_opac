@@ -15,7 +15,7 @@ if __name__ == "__main__":
     from numpy.distutils.core import setup
     setup(name=PACKAGENAME,
           description='python routines to calculate mie opacities',
-          version='1.1.1rc3',
+          version='1.1.1',
           long_description=(HERE / "README.md").read_text(),
           long_description_content_type='text/markdown',
           url='https://github.com/birnstiel/dsharp_opac',
