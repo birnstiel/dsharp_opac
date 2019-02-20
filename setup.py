@@ -23,7 +23,7 @@ if __name__ == "__main__":
         setup(
             name=PACKAGENAME,
             description='python routines to calculate mie opacities',
-            version='1.1.2',
+            version='1.1.3',
             long_description=(HERE / "README.md").read_text(),
             long_description_content_type='text/markdown',
             url='https://github.com/birnstiel/dsharp_opac',
@@ -38,7 +38,7 @@ if __name__ == "__main__":
                 'data/*.*',
                 ]},
             include_package_data=True,
-            install_requires=['scipy', 'numpy', 'matplotlib', 'astropy'],
+            install_requires=['scipy', 'numpy', 'matplotlib', 'astropy', 'mpmath'],
             zip_safe=False,
             ext_modules=extensions
             )
