@@ -34,11 +34,6 @@ sig_h2 = 2e-15  # cross section of H2 [cm^2]
 # - `bhmie_pymiecoated`
 
 try:
-    from numba import njit  # noqa
-except ImportError:
-    warnings.warn('numba not available, opacity calculation will be very slow')
-
-try:
     from .bhmie_fortran import bhmie_fortran
     bhmie_function = bhmie_fortran
     bhmie_type = 'fortran'
@@ -49,6 +44,11 @@ except ImportError:
     from .bhmie_python import bhmie_type as bt
     bhmie_type = bt
     bhmie_function = bhmie_python_wrapper
+
+    try:
+        from numba import njit  # noqa
+    except ImportError:
+        warnings.warn('numba not available, opacity calculation will be very slow')
 
 try:
     import pymiecoated
