@@ -135,6 +135,24 @@ def progress_bar(perc, text=''):
         sys.stdout.flush()
 
 
+def get_datafile(fname, base='data'):
+    """
+    Helper function to retrieve data file from packages data directory.
+
+    Argument
+    --------
+
+    fname : str
+        file name of data file
+
+    Output
+    ------
+    str : absolute path to data file
+
+    """
+    return pkg_resources.resource_filename(__name__, os.path.join(base, fname))
+
+
 def download(packagedir):
     """
     Downloads the optical constants files. It works by getting the data from
@@ -526,8 +544,7 @@ class diel_henning(diel_const):
             'waterice': 0.92
             }
         self.rho = densities[fname]
-        self.datafile = pkg_resources.resource_filename(__name__, os.path.join(
-            'optical_constants', 'henning', 'new' * new + 'old' * (not new), fname + '.lnk'))
+        self.datafile = get_datafile(os.path.join('henning', 'new' * new + 'old' * (not new), fname + '.lnk'), base='optical_constants')
         self.reference = 'Henning & Stognienko (1996)' + (not new) * ', Pollack et al. (1994)'
         if not os.path.isfile(self.datafile):
             self.download()
@@ -552,7 +569,7 @@ class diel_henning(diel_const):
     @classmethod
     def download(self):
         for i in ['old', 'new']:
-            path = pkg_resources.resource_filename(__name__, os.path.join('optical_constants', 'henning', i))
+            path = get_datafile(os.path.join('henning', i), base='optical_constants')
             download(path)
 
 
@@ -572,7 +589,7 @@ class diel_jaeger98(diel_const):
     Arguments:
     ----------
 
-    T : str
+    T : int
         temperature in celsius, can be [400, 600, 800, 1000]
     """
 
@@ -591,8 +608,7 @@ class diel_jaeger98(diel_const):
         self.rho = rhos[temps.index(T)]
 
         fname = 'cel{}.lnk'.format(T)
-        self.datafile = pkg_resources.resource_filename(__name__, os.path.join(
-            'optical_constants', 'jaeger', fname))
+        self.datafile = get_datafile(os.path.join('jaeger', fname), base='optical_constants')
         if not os.path.isfile(self.datafile):
             download(os.path.dirname(self.datafile))
         #
@@ -651,8 +667,7 @@ class diel_preibisch93(diel_const):
         elif species == 'amorphous carbon':
             fname = 'acneu.lnk'
 
-        self.datafile = pkg_resources.resource_filename(__name__, os.path.join(
-            'optical_constants', 'preibisch', fname))
+        self.datafile = get_datafile(os.path.join('preibisch', fname), base='optical_constants')
         if not os.path.isfile(self.datafile):
             download(os.path.dirname(self.datafile))
         #
@@ -717,8 +732,7 @@ class diel_pollack1994(diel_const):
 
         fname = 'P94-{}.lnk'.format(species.replace(' ', ''))
 
-        self.datafile = pkg_resources.resource_filename(__name__, os.path.join(
-            'optical_constants', 'pollack1994', fname))
+        self.datafile = get_datafile(os.path.join('pollack1994', fname), base='optical_constants')
         #
         # read data
         #
@@ -798,8 +812,7 @@ class diel_draine2003(diel_const):
 
         # download file if needed
 
-        self.datafile = pkg_resources.resource_filename(__name__, os.path.join(
-            'optical_constants', 'draine', fname))
+        self.datafile = get_datafile(os.path.join('draine', fname), base='optical_constants')
         if not os.path.isfile(self.datafile):
             download(os.path.dirname(self.datafile))
 
@@ -843,8 +856,7 @@ class diel_WeingartnerDraine2001_astrosil(diel_const):
         # open file, read header and data
         #
         self.material_str = 'Astronomical Silicates (Weingartner & Draine 2001)'
-        self.datafile = pkg_resources.resource_filename(__name__, os.path.join(
-            'optical_constants', 'draine', 'eps_suvSil'))
+        self.datafile = get_datafile(os.path.join('draine', 'eps_suvSil'), base='optical_constants')
         if not os.path.isfile(self.datafile):
             download(os.path.dirname(self.datafile))
         f = open(self.datafile)
@@ -886,8 +898,7 @@ class diel_drainelee84_astrosil(diel_const):
         # open file, read header and data
         #
         self.material_str = 'Astronomical Silicates (Draine & Lee 1984)'
-        self.datafile = pkg_resources.resource_filename(
-            __name__, os.path.join('optical_constants', 'draine', 'eps_Sil'))
+        self.datafile = get_datafile(os.path.join('draine', 'eps_Sil'), base='optical_constants')
         if not os.path.isfile(self.datafile):
             download(os.path.dirname(self.datafile))
         with open(self.datafile) as f:
@@ -978,12 +989,9 @@ class diel_zubko96(diel_const):
         self.material_str = 'Carbonaceous Grains (Zubko et al. 1996, {})'.format(sample)
         self.datafile = directory
 
-        E = np.loadtxt(pkg_resources.resource_filename(
-            __name__, os.path.join(self.datafile, 'zubko_E_{}.txt'.format(sample))))[-1::-1]
-        n = np.loadtxt(pkg_resources.resource_filename(
-            __name__, os.path.join(self.datafile, 'zubko_n_{}.txt'.format(sample))))[-1::-1]
-        k = np.loadtxt(pkg_resources.resource_filename(
-            __name__, os.path.join(self.datafile, 'zubko_k_{}.txt'.format(sample))))[-1::-1]
+        E = np.loadtxt(get_datafile(os.path.join('zubko_E_{}.txt'.format(sample)), base=self.datafile))[-1::-1]
+        n = np.loadtxt(get_datafile(os.path.join('zubko_n_{}.txt'.format(sample)), base=self.datafile))[-1::-1]
+        k = np.loadtxt(get_datafile(os.path.join('zubko_k_{}.txt'.format(sample)), base=self.datafile))[-1::-1]
         l = 0.00012398419292004205 / E  # E = h*c/lambda in CGS # noqa
         #
         # assign wavelength and optical constants
@@ -1024,8 +1032,7 @@ class diel_warren84(diel_const):
         # set the file name
         #
         fname = 'warren_1984.txt'
-        self.datafile = pkg_resources.resource_filename(
-            __name__, os.path.join('optical_constants', 'warren', fname))
+        self.datafile = get_datafile(os.path.join('warren', fname), base='optical_constants')
         if not os.path.isfile(self.datafile):
             download(self.datafile)
         #
@@ -1071,8 +1078,7 @@ class diel_warrenbrandt08(diel_const):
         # set the file name
         #
         fname = 'IOP_2008_ASCIItable.dat'
-        self.datafile = pkg_resources.resource_filename(
-            __name__, os.path.join('optical_constants', 'warren', fname))
+        self.datafile = get_datafile(os.path.join('warren', fname), base='optical_constants')
         if not os.path.isfile(self.datafile):
             download(self.datafile)
         #
@@ -1144,8 +1150,7 @@ class diel_ricci10(diel_const):
             fname = 'aC_ACH2_Zubko.dat'
         else:
             raise NameError('%s got unknown species: %s' % (type(self).__name__, species))
-        self.datafile = pkg_resources.resource_filename(
-            __name__, os.path.join('optical_constants', 'luca', fname))
+        self.datafile = get_datafile(os.path.join('luca', fname), base='optical_constants')
         #
         # read data and assign wavelength and optical constants
         #

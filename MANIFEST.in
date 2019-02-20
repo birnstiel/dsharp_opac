@@ -2,7 +2,7 @@ include README.md
 include LICENSE
 include dsharp_opac/optical_constants/*/*
 include dsharp_opac/optical_constants/*/*/*
+include dsharp_opac/*.f90
+include dsharp_opac/data/*.*
 include notebooks/*.ipynb
 include notebooks/*.py
-include notebooks/*.npz
-include notebooks/data/*.+

@@ -4,7 +4,7 @@ try:
 except ImportError:
     print('fortran mie routines unavailable')
 
-__version__ = '1.1.1'
+__version__ = '1.1.2'
 
 from .dsharp_opac import \
     progress_bar, \
@@ -40,7 +40,8 @@ from .dsharp_opac import \
     get_smooth_opacities, \
     distribution, \
     get_B11_fit, \
-    get_B11S_fit
+    get_B11S_fit, \
+    get_datafile
 
 __all__ = [
     'bhmie_python',
@@ -78,4 +79,5 @@ __all__ = [
     'size_average_opacity',
     'distribution',
     'get_B11_fit',
-    'get_B11S_fit']
+    'get_B11S_fit',
+    'get_datafile']
