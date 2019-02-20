@@ -1,10 +1,8 @@
 import numpy as np
-import warnings
 try:
     from numba import njit
     bhmie_type = 'numba'
 except ImportError:
-    warnings.warn('numba not available, opacity calculation will be very slow')
 
     def njit(ob):
         return ob
