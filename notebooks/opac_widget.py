@@ -22,7 +22,7 @@ aux.set_style()
 
 # load default opacities
 
-with np.load('data/default_opacities_smooth.npz') as d:
+with np.load(opacity.get_datafile('default_opacities_smooth.npz')) as d:
     a_w     = d['a']
     gsca_w  = d['g']
     lam_w   = d['lam']
@@ -32,7 +32,7 @@ with np.load('data/default_opacities_smooth.npz') as d:
 
 # load dry opacities
 
-with np.load('data/icefree_opacities_smooth.npz') as d:
+with np.load(opacity.get_datafile('icefree_opacities_smooth.npz')) as d:
     a_d      = d['a']
     gsca_d   = d['g']
     lam_d    = d['lam']
@@ -93,13 +93,13 @@ power_law = power_law / power_law.sum()
 k_P_pf   = np.zeros([n_grid[0]])
 k_R_pf   = np.zeros([n_grid[0]])
 
-k_abs_p_w = (k_abs_w * power_law[None, :]).sum(1)
-k_ext_p_w = (k_ext_w * power_law[None, :]).sum(1)
+k_abs_p_w = (k_abs_w.T * power_law[None, :]).sum(1)
+k_ext_p_w = (k_ext_w.T * power_law[None, :]).sum(1)
 
 # the dry ones
 
-k_abs_p_d = (k_abs_d * power_law[None, :]).sum(1)
-k_ext_p_d = (k_ext_d * power_law[None, :]).sum(1)
+k_abs_p_d = (k_abs_d.T * power_law[None, :]).sum(1)
+k_ext_p_d = (k_ext_d.T * power_law[None, :]).sum(1)
 
 for it, _T in enumerate(par_grid[0]):
     Bnu    = aux.planck_B_nu(nu, _T)
@@ -140,27 +140,27 @@ def get_data(values):
     if T < aux.t_sat_water(sigma_g, M_star, r):
         # sum the absorption opacity
 
-        k_abs_f1 = (k_abs_w * f1[None, :]).sum(1)
-        k_abs_f2 = (k_abs_w * f2[None, :]).sum(1)
-        k_abs_pl = (k_abs_w * power_law[None, :]).sum(1)
+        k_abs_f1 = (k_abs_w.T * f1[None, :]).sum(1)
+        k_abs_f2 = (k_abs_w.T * f2[None, :]).sum(1)
+        k_abs_pl = (k_abs_w.T * power_law[None, :]).sum(1)
 
         # sum the EXTINCTION opacity
 
-        k_ext_f1 = (k_ext_w * f1[None, :]).sum(1)
-        k_ext_f2 = (k_ext_w * f2[None, :]).sum(1)
-        k_ext_pl = (k_ext_w * power_law[None, :]).sum(1)
+        k_ext_f1 = (k_ext_w.T * f1[None, :]).sum(1)
+        k_ext_f2 = (k_ext_w.T * f2[None, :]).sum(1)
+        k_ext_pl = (k_ext_w.T * power_law[None, :]).sum(1)
     else:
         # sum the DRY absorption opacity
 
-        k_abs_f1 = (k_abs_d * f1[None, :]).sum(1)
-        k_abs_f2 = (k_abs_d * f2[None, :]).sum(1)
-        k_abs_pl = (k_abs_d * power_law[None, :]).sum(1)
+        k_abs_f1 = (k_abs_d.T * f1[None, :]).sum(1)
+        k_abs_f2 = (k_abs_d.T * f2[None, :]).sum(1)
+        k_abs_pl = (k_abs_d.T * power_law[None, :]).sum(1)
 
         # sum the DRY EXTINCTION opacity
 
-        k_ext_f1 = (k_ext_d * f1[None, :]).sum(1)
-        k_ext_f2 = (k_ext_d * f2[None, :]).sum(1)
-        k_ext_pl = (k_ext_d * power_law[None, :]).sum(1)
+        k_ext_f1 = (k_ext_d.T * f1[None, :]).sum(1)
+        k_ext_f2 = (k_ext_d.T * f2[None, :]).sum(1)
+        k_ext_pl = (k_ext_d.T * power_law[None, :]).sum(1)
 
     # calculate Planck opacity for the fit and the power-law
 
