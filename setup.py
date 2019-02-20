@@ -38,7 +38,7 @@ if __name__ == "__main__":
                 'data/*.*',
                 ]},
             include_package_data=True,
-            install_requires=['scipy', 'numpy', 'matplotlib', 'astropy'],
+            install_requires=['scipy', 'numpy', 'matplotlib', 'astropy', 'mpmath'],
             zip_safe=False,
             ext_modules=extensions
             )
