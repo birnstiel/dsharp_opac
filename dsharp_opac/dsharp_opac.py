@@ -1631,7 +1631,7 @@ def get_kappa_from_q(a, m, q_abs, q_sca):
 
 
 def get_size_averaged_opacity(a, lam, n, rho_s, diel_const=None, q_abs=None,
-                              q_sca=None, k_abs=None, k_sca=None):
+                              q_sca=None, kappa_abs=None, kappa_sca=None):
     """
     Averages the opacity over the given size distribution.
 
@@ -1664,7 +1664,7 @@ def get_size_averaged_opacity(a, lam, n, rho_s, diel_const=None, q_abs=None,
         been calculated, then you can pass it along, otherwise
         it will be calculated on the fly.
 
-    q_abs,q_sca : array
+    kappa_abs,kappa_sca : array
         if the opacity for all sizes and wavelength has already
         been calculated, then you can pass it along, otherwise
         it will be calculated on the fly.
@@ -1675,7 +1675,7 @@ def get_size_averaged_opacity(a, lam, n, rho_s, diel_const=None, q_abs=None,
         the opacity at each wavelength averaged over the size
         distribution and normalized per 1 g of dust.
     """
-    if (q_abs is None or q_sca is None) and (k_abs is None or k_sca is None) \
+    if (q_abs is None or q_sca is None) and (kappa_abs is None or kappa_sca is None) \
             and (diel_const is None):
         raise AssertionError('Either (diel_const) or (q_abs, q_sca) or (k_abs, k_sca) needed as input')
     #
@@ -1687,11 +1687,11 @@ def get_size_averaged_opacity(a, lam, n, rho_s, diel_const=None, q_abs=None,
     #
     # calculate the opacities ...
     #
-    if (q_abs is None or q_sca is None) and (k_abs is None or k_sca is None):
+    if (q_abs is None or q_sca is None) and (kappa_abs is None or kappa_sca is None):
         package = get_mie_coefficients(a, lam, diel_const)
         q_abs = package['q_abs']
         q_sca = package['q_sca']
-    elif (k_abs is None or k_sca is None):
+    elif (kappa_abs is None or kappa_sca is None):
         kappa_abs, kappa_sca = get_kappa_from_q(a, m, q_abs, q_sca)
     #
     # ... average them over the size distribution ...
