@@ -1915,9 +1915,9 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function,
     return package
 
 
-def calculate_mueller_matrix(lam, m, S1, S2):
+def calculate_mueller_matrix(lam, m, S1, S2, theta=None, k_sca=None):
     """
-    Calculate the Mueller matrix elements given the scattering amplitudes
+    Calculate the Mueller matrix elements Zij given the scattering amplitudes
     S1 and S2.
 
     Arguments:
@@ -1933,6 +1933,18 @@ def calculate_mueller_matrix(lam, m, S1, S2):
         scattering amplitudes of shape (nm, nlam, nangles), where
         nangles is the length of the angle array for which the amplitudes
         were calculated.
+
+    Keywords:
+    ---------
+
+    If theta and k_sca are given, a check is done, if the integral over the
+    scattering matrix elements is identical to the scattering opacities.
+
+    theta : array
+        array of angles
+
+    k_sca : array
+        array of scattering opacities
 
     Notes:
     ------
@@ -1963,7 +1975,30 @@ def calculate_mueller_matrix(lam, m, S1, S2):
     zscat[..., 4] = S34 * factor[:, :, None]
     zscat[..., 5] = S33 * factor[:, :, None]
 
-    return zscat
+    #
+    # If possible, do a check if the integral over zscat is consistent
+    # with kscat
+    #
+    kscat_from_z11 = np.zeros_like(k_sca)
+    error_tolerance = 0.01
+    error_max = 0.0
+    if theta is not None and k_sca is not None:
+        n_theta = len(theta)
+        mu = np.cos(theta * np.pi / 180.)
+        dmu = np.diff(mu)
+        for ia in range(len(m)):
+            for ilam in range(len(lam)):
+                zav = 0.5 * (zscat[ia, ilam, 1:n_theta, 0] + zscat[ia, ilam, 0:n_theta - 1, 0])
+                dum = -0.5 * zav * dmu
+                sum = dum.sum() * 4 * np.pi
+                kscat_from_z11[ia, ilam] = sum
+                err = abs(sum / k_sca[ia, ilam] - 1.0)
+                error_max = max(err, error_max)
+
+    if error_max > error_tolerance:
+        warnings.warn('Maximum error of {:.2g}%: above error tolerance'.format(error_max * 100))
+
+    return {'zscat': zscat, 'kscat_from_z11': kscat_from_z11, 'error_max': error_max}
 
 
 def make_opacity_dict(lam, a, k_abs, k_sca, g_sca, rho_s, zscat=None):
