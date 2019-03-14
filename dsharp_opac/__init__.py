@@ -12,6 +12,7 @@ from .dsharp_opac import \
     diel_from_lnk_file, \
     diel_henning, \
     diel_jaeger98, \
+    diel_segelstein_water, \
     diel_preibisch93, \
     diel_pollack1994, \
     diel_draine2003, \
@@ -51,6 +52,7 @@ __all__ = [
     'diel_from_lnk_file',
     'diel_henning',
     'diel_jaeger98',
+    'diel_segelstein_water',
     'diel_preibisch93',
     'diel_pollack1994',
     'diel_draine2003',

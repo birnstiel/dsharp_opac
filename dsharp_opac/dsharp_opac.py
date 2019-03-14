@@ -636,6 +636,70 @@ class diel_jaeger98(diel_const):
         self.print_reference()
 
 
+class diel_segelstein_water(diel_const):
+    """
+    Returns the dielectric constants for liquid water from:
+
+    [Segelstein 1981](http://hdl.handle.net/10355/11599)
+
+    The data comes from [refractiveindex.info](https://refractiveindex.info/?shelf=main&book=H2O&page=Segelstein)
+
+    Density from [wolfram alpha](https://www.wolframalpha.com/input/?i=water+density+at+25+C)
+
+    """
+    def __init__(self):
+        """
+        Overwrite the initialization of the parent class
+        """
+        #
+        # set the path and do some safety checks
+        #
+        self.material_str = 'Liquid water, T=25 C (Segelstein 1981)'
+        self.rho = 0.997
+
+        fname = 'Segelstein.csv'
+        self.datafile = get_datafile(os.path.join('segelstein_water', fname), base='optical_constants')
+        if not os.path.isfile(self.datafile):
+            download(os.path.dirname(self.datafile))
+        #
+        # read data
+        #
+        print('Reading opacities from %s' % fname)
+        with open(self.datafile) as f:
+            l_n = []
+            l_k = []
+
+            for line in f:
+                line = line.strip()
+                if line == '':
+                    continue
+                elif line.startswith('wl,n'):
+                    data = l_n
+                elif line.startswith('wl,k'):
+                    data = l_k
+                else:
+                    data += [[float(x) for x in line.split(',')]]
+        l_n = np.array(l_n)
+        l_k = np.array(l_k)
+        if np.allclose(l_n[:, 0], l_k[:, 0]):
+            lam = l_n[:, 0]
+            n = l_n[:, 1]
+            k = l_k[:, 1]
+        #
+        # assign wavelength and optical constants
+        #
+        self._l = lam * 1e-4
+        self._n = n
+        self._k = k
+        self._ll = np.log10(self._l)
+        self._ln = np.log10(self._n)
+        self._lk = np.log10(self._k)
+        self._lmin = self._l.min()
+        self._lmax = self._l.max()
+        self.reference = 'Segelstein 1981'
+        self.print_reference()
+
+
 class diel_preibisch93(diel_const):
     """
     Returns the dielectric constants for the materials discussed in
