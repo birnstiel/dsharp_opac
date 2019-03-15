@@ -1,3 +1,4 @@
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/b04c8f86251749ac92361c6431103a08)](https://app.codacy.com/app/birnstiel/dsharp_opac?utm_source=github.com&utm_medium=referral&utm_content=birnstiel/dsharp_opac&utm_campaign=Badge_Grade_Dashboard)
 [![DOI](https://zenodo.org/badge/137751482.svg)](https://zenodo.org/badge/latestdoi/137751482)
 
 # DSHARP Mie-Opacity Library
