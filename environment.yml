@@ -3,6 +3,7 @@ channels:
 dependencies:
    - setuptools
    - numpy
+   - numba
    - scipy
    - matplotlib
    - astropy
