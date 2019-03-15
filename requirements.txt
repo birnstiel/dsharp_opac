@@ -5,4 +5,4 @@ matplotlib
 astropy
 ipython
 mpmath
--e git://github.com/birnstiel/dsharp_opac.git#egg=dsharp_opac
+-e git://github.com/birnstiel/dsharp_opac#egg=dsharp_opac
