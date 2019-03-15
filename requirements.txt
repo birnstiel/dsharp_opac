@@ -1,8 +1,0 @@
-setuptools
-numpy
-scipy
-matplotlib
-astropy
-ipython
-mpmath
--e git://github.com/birnstiel/dsharp_opac#egg=dsharp_opac

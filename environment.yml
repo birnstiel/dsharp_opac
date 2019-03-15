@@ -1,0 +1,12 @@
+name: base
+channels:
+dependencies:
+   - setuptools
+   - numpy
+   - scipy
+   - matplotlib
+   - astropy
+   - ipython
+   - mpmath
+   - pip:
+     - "--editable=git+https://github.com/birnstiel/dsharp_opac.git#egg=dhsarp_opac-master"
