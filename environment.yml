@@ -1,0 +1,11 @@
+name: base
+channels:
+  - conda-forge
+dependencies:
+  - setuptools
+  - numpy
+  - scipy
+  - matplotlib
+  - astropy
+  - ipython
+  - mpmath
