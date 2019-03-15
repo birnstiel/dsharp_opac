@@ -1882,7 +1882,7 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function,
         # loop through the sizes that converge
         #
         for ia, x in enumerate(X_cut):
-            S1, S2, _, Qabs, Qsca, Qback, gsca = bhmie_function(x, complex(n, k), nang)
+            S1, S2, _, Qabs, Qsca, _, gsca = bhmie_function(x, complex(n, k), nang)
             q_abs[ia, ilam] = Qabs
             q_sca[ia, ilam] = Qsca
             g_sca[ia, ilam] = gsca.real
@@ -1990,9 +1990,9 @@ def calculate_mueller_matrix(lam, m, S1, S2, theta=None, k_sca=None):
             for ilam in range(len(lam)):
                 zav = 0.5 * (zscat[ia, ilam, 1:n_theta, 0] + zscat[ia, ilam, 0:n_theta - 1, 0])
                 dum = -0.5 * zav * dmu
-                sum = dum.sum() * 4 * np.pi
-                kscat_from_z11[ia, ilam] = sum
-                err = abs(sum / k_sca[ia, ilam] - 1.0)
+                integral = dum.sum() * 4 * np.pi
+                kscat_from_z11[ia, ilam] = integral
+                err = abs(integral / k_sca[ia, ilam] - 1.0)
                 error_max = max(err, error_max)
 
     if error_max > error_tolerance:
@@ -2558,7 +2558,7 @@ def size_average_opacity(lam_avg, a, lam, k_abs, k_sca, q=3.5, plot=False, ax=No
 
     if plot:
         if ax is None:
-            f, ax = plt.subplots()
+            _, ax = plt.subplots()
         ax = np.array(ax, ndmin=1)
         lines = []
         lines += ax[0].loglog(a, ka[0, :], '-', label=r'absorption, $\lambda = {:2.2g}$ mm'.format(lam_avg[0] * 10))

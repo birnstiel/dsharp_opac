@@ -25,7 +25,7 @@ If you use any optical constants, please cite the appropriate experimental paper
 
       Should you work on the sources, e.g. for including new optical constants or new mehtods, then we recommend linking the installation to the source folder. Changes to the sources will then be reflected upon `import dsharp_opac` without the need to reinstall the package.
 
-  - last release from [pypi.org](pypi.org):
+- last release from [pypi.org](pypi.org):
 
         pip install dsharp_opac
 
