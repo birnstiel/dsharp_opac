@@ -1772,7 +1772,7 @@ def get_size_averaged_opacity(a, lam, n, rho_s, diel_const=None, q_abs=None,
 
 
 def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function,
-                         nang=3, return_all=False, extrapolate_large_grains=False):
+                         nang=3, extrapolate_large_grains=False):
     """
     This calculates the opacity for the given dielectric constants for all
     grain sizes and wavelength specified in LAM and A.
@@ -2384,7 +2384,7 @@ def get_ricci_mix(extrapol=False, lmax=None, rule='Bruggeman'):
 
 
 def get_opacities(a, lam, rho_s, diel_const, bhmie_function=bhmie_function,
-                  return_all=False, extrapol=False, n_angle=3,
+                  extrapol=False, n_angle=3,
                   extrapolate_large_grains=False):
     """
     Calculates opacities according to some specified method for
@@ -2450,7 +2450,7 @@ def get_opacities(a, lam, rho_s, diel_const, bhmie_function=bhmie_function,
     m = 4 * np.pi / 3. * rho_s * a**3
 
     package = get_mie_coefficients(
-        a, lam, diel_const, return_all=True,
+        a, lam, diel_const,
         bhmie_function=bhmie_function, nang=n_angle,
         extrapolate_large_grains=extrapolate_large_grains)
 
