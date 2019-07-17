@@ -2135,15 +2135,15 @@ def write_radmc3d_scatmat_file(index, opacity_dict, name, path='.'):
     - [1] http://www.ita.uni-heidelberg.de/~dullemond/software/radmc-3d/
 
     """
-    filename = os.path.join(dir, 'dustkapscatmat_{}.inp'.format(name))
+    filename = os.path.join(path, 'dustkapscatmat_{}.inp'.format(name))
 
     with open(filename, 'w') as f:
         f.write('# Opacity and scattering matrix file for ' + name + '\n')
         f.write('# Please do not forget to cite in your publications theoriginal paper of these optical constant measurements\n')
-        f.write('# Made with the DISKLAB package code by Cornelis Dullemond & Til Birnstiel\n')
-        f.write('# using the bhmie.py Mie code of Bohren and Huffman (python version by Cornelis Dullemond,')
-        f.write('# F90 version by Til Birnstiel, both after the original bhmie.f code by Bruce Draine)\n')
-        f.write('# Grain size = {0:13.6e} cm\n'.format(opacity_dict["a"]))
+        f.write('# Made with the DSHARO_OPAC package by Cornelis Dullemond & Til Birnstiel\n')
+        f.write('# using either the bhmie.py Mie code of Bohren and Huffman (python version by Cornelis Dullemond,\n')
+        f.write('# or a F90 version by Til Birnstiel, both after the original bhmie.f code by Bruce Draine)\n')
+        f.write('# Grain size = {0:13.6e} cm\n'.format(opacity_dict["a"][index]))
         f.write('# Material density = {0:6.3f} g/cm^3\n'.format(opacity_dict["rho_s"]))
         f.write('1\n')  # Format number
         f.write('{0:d}\n'.format(opacity_dict["lam"].size))
@@ -2151,9 +2151,9 @@ def write_radmc3d_scatmat_file(index, opacity_dict, name, path='.'):
         f.write('\n')
         for i in range(opacity_dict['lam'].size):
             f.write('%13.6e %13.6e %13.6e %13.6e\n' % (opacity_dict['lam'][i] * 1e4,
-                                                       opacity_dict['k_abs'][i],
-                                                       opacity_dict['k_scat'][i],
-                                                       opacity_dict['g_scat'][i]))
+                                                       opacity_dict['k_abs'][index, i],
+                                                       opacity_dict['k_sca'][index, i],
+                                                       opacity_dict['g'][index, i]))
         f.write('\n')
         for j in range(opacity_dict['theta'].size):
             f.write('%13.6e\n' % (opacity_dict['theta'][j]))
@@ -2161,9 +2161,9 @@ def write_radmc3d_scatmat_file(index, opacity_dict, name, path='.'):
         for ilam in range(opacity_dict['lam'].size):
             for itheta in range(opacity_dict['theta'].size):
                 f.write('%13.6e %13.6e %13.6e %13.6e %13.6e %13.6e\n' %
-                        (opacity_dict['zscat'][ilam, itheta, 0], opacity_dict['zscat'][ilam, itheta, 1],
-                         opacity_dict['zscat'][ilam, itheta, 2], opacity_dict['zscat'][ilam, itheta, 3],
-                         opacity_dict['zscat'][ilam, itheta, 4], opacity_dict['zscat'][ilam, itheta, 5]))
+                        (opacity_dict['zscat'][index, ilam, itheta, 0], opacity_dict['zscat'][index, ilam, itheta, 1],
+                         opacity_dict['zscat'][index, ilam, itheta, 2], opacity_dict['zscat'][index, ilam, itheta, 3],
+                         opacity_dict['zscat'][index, ilam, itheta, 4], opacity_dict['zscat'][index, ilam, itheta, 5]))
         f.write('\n')
 
 
