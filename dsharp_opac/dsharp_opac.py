@@ -2081,6 +2081,121 @@ def write_disklab_opacity(fname, opac_dict, path='.'):
     np.savez_compressed(os.path.join(path, fname), **dictionary)
 
 
+def write_radmc3d_dustkappa_from_array(name, lam, k_abs, k_sca, g=None, path='.'):
+    """
+    Write out the opacity such that it can be read from
+    RADMC-3D. This function writes the file dustkappa_[name].inp which
+    writes only the absorption opacity, scattering opacity, and the
+    assymetry parameter g as function of wavelength into the file.
+
+    Arguments:
+    ----------
+
+    name : str
+        name to be put in the filename: dustkappa_[name].inp
+
+    lam : array-like
+        wavelength grid in cm (will be writtin in micron)
+
+    k_abs, k_sca, g : array-like
+        absorption and scattering opacity and asymmetry factor on array `lam`
+
+    Keywords:
+    ---------
+
+    path : str
+        path where to write the file, default: current dir
+
+    Output:
+    -------
+    writes out the file dustkappa_[name].inp
+    """
+    filename = 'dustkappa_' + name + '.inp'
+
+    if g is None:
+        data = np.array([
+            lam * 1e4,
+            k_abs,
+            k_sca
+            ]).T
+    else:
+        data = np.array([
+            lam * 1e4,
+            k_abs,
+            k_sca,
+            g
+            ]).T
+
+    header = '3\n{:d}\n'.format(len(lam))
+    np.savetxt(filename, data, header=header, comments='')
+
+
+def write_radmc3d_dustkappa_from_dict(name, opac_dict, i_grain=None, a_grain=None, path='.'):
+    """
+    Wrapper to `write_radmc3d_dustkappa_fromarray`. Here, an opacity dict can
+    be passed and a grain index or grain size to select which particle size to
+    write out. Grain size will interpolate, grain index will pick a specific index.
+
+    This function writes the file dustkappa_[name].inp which
+    writes only the absorption opacity, scattering opacity, and the
+    assymetry parameter g as function of wavelength into the file.
+
+    Arguments:
+    ----------
+
+    name : str
+        name to be appended to the filename (RADMC-3D convention)
+
+    opac_dict : dict
+        the opacity dict as coming out of `get_opacities`.
+
+    Keywords:
+    ---------
+
+    i_grain : int
+        which particle index to write out (pass ONE OF a_grain or i_grain)
+
+    a_grain : float
+        which particle size to write out (pass ONE OF a_grain or i_grain)
+
+
+    path : str
+        path where to write the file, default: current dir
+
+    Output:
+    -------
+    writes out the file dustkappa_[name].inp
+    """
+    from scipy.interpolate import interp1d
+    if (a_grain is None and i_grain is None) or (a_grain is not None and i_grain is not None):
+        raise ValueError('Need to pass either a_grain or i_grain')
+
+    if i_grain is not None:
+
+        # if i_grain is given, just pick it
+
+        lam   = opac_dict['lam']
+        k_abs = opac_dict['k_abs'][i_grain]
+        k_sca = opac_dict['k_sca'][i_grain]
+        g     = opac_dict['g'][i_grain]
+    else:
+
+        # if a_grain is given: interpolate (log-log in kappa, log-lin in g)
+
+        lam   = opac_dict['lam']
+        k_abs = opac_dict['k_abs']
+        k_sca = opac_dict['k_sca']
+        g     = opac_dict['g']
+
+        f = interp1d(np.log10(opac_dict['a']), np.array([np.log10(k_abs), np.log10(k_sca), g]), axis=1)
+
+        lk_abs, lk_sca, g = f(np.log10(a_grain))
+        k_abs = 10.**lk_abs
+        k_sca = 10.**lk_sca
+
+    write_radmc3d_dustkappa_from_array(name, lam, k_abs, k_sca, g, path=path)
+
+
 def write_radmc3d_scatmat_file(index, opacity_dict, name, path='.'):
     """
     The RADMC-3D radiative transfer package[1] can perform dust continuum
