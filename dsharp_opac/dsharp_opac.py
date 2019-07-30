@@ -2372,7 +2372,7 @@ def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False, ax=None, twoaxes
         return ax1
 
 
-def get_dsharp_mix(fm_ice=0.2, rule='Bruggeman'):
+def get_dsharp_mix(fm_ice=0.2, porosity=0.0, rule='Bruggeman'):
     """
     This method calculates the mixed mie coefficients for the DSHARP project.
 
@@ -2390,6 +2390,10 @@ def get_dsharp_mix(fm_ice=0.2, rule='Bruggeman'):
 
     fm_ice : float
         mass fraction of water ice.
+
+    porosity : float
+        porosity = vacuum volume fraction as float between [0, 1].
+        Vaccum will be mixed in a second step with the rest using the MG-Rule.
 
     rule : str
         'Bruggeman' or 'Maxwell-Garnett'. Ricci et al. 2010 used 'Bruggeman'.
@@ -2444,7 +2448,13 @@ def get_dsharp_mix(fm_ice=0.2, rule='Bruggeman'):
 
     # mix the optical constants using the Bruggeman rule
 
-    return diel_mixed(constants, f_vol, rule=rule), rho_s
+    diel_const = diel_mixed(constants, f_vol, rule=rule)
+
+    if porosity > 0:
+        diel_const = diel_mixed([diel_vacuum(), diel_const], [porosity, (1 - porosity)], rule='Maxwell-Garnett')
+        rho_s *= 1 - porosity
+
+    return diel_const, rho_s
 
 
 def get_ricci_mix(extrapol=False, lmax=None, rule='Bruggeman'):
