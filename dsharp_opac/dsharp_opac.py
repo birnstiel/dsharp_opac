@@ -2382,7 +2382,7 @@ def get_dsharp_mix(fm_ice=0.2, porosity=0.0, rule='Bruggeman'):
 
     |                 | water ice | astrosilicates | troilite    | organics  |
     |:---------------:|:---------:|:--------------:|:-----------:|:---------:|
-    | volume fraction | 0.5737    | 0.1120         | 0.0173      | 0.2970    |
+    | volume fraction | 0.3642    | 0.167          | 0.02578     | 0.443     |
     | solid densities | 0.92 g/cc | 3.3 g/cc       | 4.83 g/cc   | 1.5 g/cc  |
 
     Keywords:
@@ -2413,7 +2413,7 @@ def get_dsharp_mix(fm_ice=0.2, porosity=0.0, rule='Bruggeman'):
         diel_warrenbrandt08(),
         diel_draine2003('astrosilicates'),
         diel_henning('troilite'),
-        diel_henning('organics'),
+        diel_henning('organics', refractory=True),
         ]
 
     # material densities
