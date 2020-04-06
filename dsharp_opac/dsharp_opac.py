@@ -2794,12 +2794,18 @@ def get_smooth_opacities(a, lam, rho_s, diel_const, smoothing='linear', **kwargs
     k_abs_h  = res_h['k_abs']
     k_sca_h  = res_h['k_sca']
     g_h      = res_h['g']
+    S1_h     = res_h['S1']
+    S2_h     = res_h['S2']
+    theta    = res_h['theta']
+    n_theta  = len(theta)
 
     # create arrays to store the smoothed values
 
     k_sca_avg_h = np.zeros((len(a), len(lam)))
     k_abs_avg_h = np.zeros((len(a), len(lam)))
     g_avg_h     = np.zeros((len(a), len(lam)))
+    S1_avg_h    = np.zeros((len(a), len(lam), n_theta), dtype=S1_h.dtype)
+    S2_avg_h    = np.zeros((len(a), len(lam), n_theta), dtype=S1_h.dtype)
 
     # for each low-res grid point ...
 
@@ -2822,6 +2828,8 @@ def get_smooth_opacities(a, lam, rho_s, diel_const, smoothing='linear', **kwargs
         k_abs_avg_h[i, :] = (w[:, None] * k_abs_h[i0:i1, :]).sum(0)
         k_sca_avg_h[i, :] = (w[:, None] * k_sca_h[i0:i1, :]).sum(0)
         g_avg_h[i, :]     = (w[:, None] * g_h[i0:i1, :]).sum(0)
+        S1_avg_h[i, :, :]  = (w[:, None, None] * S1_h[i0:i1, :, :]).sum(0)
+        S2_avg_h[i, :, :]  = (w[:, None, None] * S2_h[i0:i1, :, :]).sum(0)
 
     # store the results in the dictionary
 
@@ -2829,5 +2837,7 @@ def get_smooth_opacities(a, lam, rho_s, diel_const, smoothing='linear', **kwargs
     res_h['k_sca_avg_h'] = k_sca_avg_h
     res_h['g_avg_h'] = g_avg_h
     res_h['a_h'] = a_h
+    res_h['S1_avg_h'] = S1_avg_h
+    res_h['S2_avg_h'] = S2_avg_h
 
     return res_h
