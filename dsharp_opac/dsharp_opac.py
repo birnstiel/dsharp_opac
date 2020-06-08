@@ -2787,12 +2787,17 @@ def get_smooth_opacities(a, lam, rho_s, diel_const, smoothing='linear', **kwargs
     for i in range(len(a)):
         a_h = np.hstack((a_h, np.linspace(a[i] - da[i], a[i] + da[i], n_inter)))
 
+    if np.any(a_h < 0):
+        raise ValueError('particle size smaller 0, please increase particle size grid resolution')
+
     # calculate the high res opacities
 
     res_h = get_opacities(a_h, lam, rho_s, diel_const, **kwargs)
 
     k_abs_h  = res_h['k_abs']
     k_sca_h  = res_h['k_sca']
+    q_abs_h  = res_h['q_abs']
+    q_sca_h  = res_h['q_sca']
     g_h      = res_h['g']
     S1_h     = res_h['S1']
     S2_h     = res_h['S2']
@@ -2831,13 +2836,25 @@ def get_smooth_opacities(a, lam, rho_s, diel_const, smoothing='linear', **kwargs
         S1_avg_h[i, :, :]  = (w[:, None, None] * S1_h[i0:i1, :, :]).sum(0)
         S2_avg_h[i, :, :]  = (w[:, None, None] * S2_h[i0:i1, :, :]).sum(0)
 
-    # store the results in the dictionary
+    # store the results in the dictionary, but keep the high-res results with new name
 
-    res_h['k_abs_avg_h'] = k_abs_avg_h
-    res_h['k_sca_avg_h'] = k_sca_avg_h
-    res_h['g_avg_h'] = g_avg_h
-    res_h['a_h'] = a_h
-    res_h['S1_avg_h'] = S1_avg_h
-    res_h['S2_avg_h'] = S2_avg_h
+    res_h['a_h']     = a_h
+    res_h['k_abs_h'] = k_abs_h
+    res_h['k_sca_h'] = k_sca_h
+    res_h['q_abs_h'] = q_abs_h
+    res_h['q_sca_h'] = q_sca_h
+    res_h['g_h']     = g_h
+    res_h['S1_h']    = S1_h
+    res_h['S2_h']    = S2_h
+
+    res_h['k_abs'] = k_abs_avg_h
+    res_h['k_sca'] = k_sca_avg_h
+    res_h['g']     = g_avg_h
+    res_h['a']     = a
+    res_h['S1']    = S1_avg_h
+    res_h['S2']    = S2_avg_h
+
+    res_h['q_abs']    = k_abs_avg_h * (4 / 3 * rho_s * a)[:, None]
+    res_h['q_sca']    = k_sca_avg_h * (4 / 3 * rho_s * a)[:, None]
 
     return res_h
