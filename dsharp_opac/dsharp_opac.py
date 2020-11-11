@@ -13,11 +13,11 @@ import warnings
 import pkg_resources
 import astropy.constants as const
 
-au     = const.au.cgs.value
-M_sun  = const.M_sun.cgs.value
-k_b    = const.k_B.cgs.value
-m_p    = const.m_p.cgs.value
-G      = const.G.cgs.value
+au = const.au.cgs.value
+M_sun = const.M_sun.cgs.value
+k_b = const.k_B.cgs.value
+m_p = const.m_p.cgs.value
+G = const.G.cgs.value
 sig_h2 = 2e-15  # cross section of H2 [cm^2]
 
 # next we need to define the bhmie function. By default we try to use the
@@ -236,14 +236,14 @@ class diel_const(object):
         if self.reference is not None:
             print('Please cite {} when using these optical constants'.format(self.reference) + appendix)
 
-    def nk(self, l):
+    def nk(self, lam):
         """
-        Return the optical properties interpolated at wavelength l
+        Return the optical properties interpolated at wavelength lam
 
         Arguments:
         ----------
 
-        l : float or array
+        lam : float or array
         :    wavelength in cm
 
         Output:
@@ -254,20 +254,20 @@ class diel_const(object):
         k : float
         :    imaginary part of optical property
         """
-        if np.array(l, ndmin=1).min() < self._lmin or np.array(l, ndmin=1).max() > self._lmax:
-            raise NameError('{}: wavelength {:g} outside data-range [{:g},{:g}]'.format(type(self).__name__, l, self._lmin, self._lmax))
+        if np.array(lam, ndmin=1).min() < self._lmin or np.array(lam, ndmin=1).max() > self._lmax:
+            raise NameError('{}: wavelength {:g} outside data-range [{:g},{:g}]'.format(type(self).__name__, lam, self._lmin, self._lmax))
 
         log_interp = True
         if self._has_negative_n:
             # estimate if log interpolation is ok to do
-            n = np.interp(l, self._l, self._n)
+            n = np.interp(lam, self._l, self._n)
             if n < 0:
                 log_interp = False
 
         if log_interp:
-            result = 10.**np.interp(np.log10(l), self._ll, self._ln), 10.**np.interp(np.log10(l), self._ll, self._lk)
+            result = 10.**np.interp(np.log10(lam), self._ll, self._ln), 10.**np.interp(np.log10(lam), self._ll, self._lk)
         else:
-            result = np.interp(l, self._l, self._n), 10.**np.interp(np.log10(l), self._ll, self._lk)
+            result = np.interp(lam, self._l, self._n), 10.**np.interp(np.log10(lam), self._ll, self._lk)
 
         return result
 
@@ -547,7 +547,7 @@ class diel_henning(diel_const):
             'troilite': 4.83,
             'watericek': 0.92,
             'waterice': 0.92
-            }
+        }
         self.rho = densities[fname]
         self.datafile = get_datafile(os.path.join('henning', 'new' * new + 'old' * (not new), fname + '.lnk'), base='optical_constants')
         self.reference = 'Henning & Stognienko (1996)' + (not new) * ', Pollack et al. (1994)'
@@ -606,7 +606,7 @@ class diel_jaeger98(diel_const):
         # set the path and do some safety checks
         #
         temps = [400, 600, 800, 1000]
-        rhos  = [1.435, 1.670, 1.843, 1.988]
+        rhos = [1.435, 1.670, 1.843, 1.988]
         if T not in temps:
             raise AssertionError("invalid temperature, use {}".format(temps))
         self.material_str = 'Carbonaceous dust, T={} C (Jaeger et al. 1998)'.format(T)
@@ -647,6 +647,7 @@ class diel_segelstein_water(diel_const):
     Density from [wolfram alpha](https://www.wolframalpha.com/input/?i=water+density+at+25+C)
 
     """
+
     def __init__(self):
         """
         Overwrite the initialization of the parent class
@@ -1011,12 +1012,12 @@ class diel_vacuum(diel_const):
         """
         self.material_str = 'Vacuum'
 
-    def nk(self, l):
+    def nk(self, l_value):
         """
         Get the n and k values at the given wavelength.
         """
-        l = np.array(l, ndmin=1) # noqa
-        return np.array([np.ones(len(l)), np.zeros(len(l))])
+        l_value = np.array(l_value, ndmin=1)  # noqa
+        return np.array([np.ones(len(l_value)), np.zeros(len(l_value))])
 
 
 class diel_zubko96(diel_const):
@@ -1226,7 +1227,7 @@ class diel_ricci10(diel_const):
         f = open(self.datafile)
         self.headerinfo = [f.readline() for i in range(2)]
         data = np.loadtxt(f)
-        l = data[:, 0] * 1e-4 # noqa
+        l = data[:, 0] * 1e-4  # noqa
         n = data[:, 1] + 1.0
         k = data[:, 2]
         #
@@ -1255,14 +1256,14 @@ class diel_ricci10(diel_const):
             res = curve_fit(fct, np.log10(l[i_min:]), np.log10(k[i_min:]), [np.log10(k[-1]), 1, 0])
             ke = 10.**fct(np.log10(le), *res[0])
             k = np.append(k, ke)
-            l = np.append(l, le) # noqa
+            l = np.append(l, le)  # noqa
             #
             # LOWER EXTRAPOLATION: constant
             #
             if lmin is not None:
                 n = np.append(n[0], n)
                 k = np.append(k[0], k)
-                l = np.append(lmin, l) # noqa
+                l = np.append(lmin, l)  # noqa
         #
         # assign the attributes
         #
@@ -1328,14 +1329,14 @@ class diel_mixed():
         self.rule = rule
         self.extrapol = extrapol
 
-    def nk(self, l):
+    def nk(self, lam):
         """
         Returns the mixed optical constants at the given wavelength
 
         Arguments:
         ----------
 
-        l : float or array
+        lam : float or array
         :    wavelength in cm
 
         Output:
@@ -1347,14 +1348,14 @@ class diel_mixed():
         :    imaginary part of mixed optical property
         """
         from mpmath import findroot
-        l_arr = np.array(l, ndmin=1)
+        l_arr = np.array(lam, ndmin=1)
         eps_mean = np.empty(np.shape(l_arr)).astype('complex')
 
-        for i, l in enumerate(l_arr):
+        for i, _l in enumerate(l_arr):
             #
             # calculate eps = (n + I*k)**2 for each material
             #
-            eps = np.array([complex(*c.nk(l))**2 for c in self.constants])
+            eps = np.array([complex(*c.nk(_l))**2 for c in self.constants])
 
             if self.rule.lower() == 'bruggeman':
                 #
@@ -1575,10 +1576,10 @@ def get_B11S_fit(T, a, r=au, sigma_g=200., d2g=0.01, rho_s=1.6686, M_star=M_sun,
         if true: include the first stokes drag regime when calculating sizes
         if false: only calculate sizes in the Epstein regime
     """
-    cs  = np.sqrt(k_b * T / (mu * m_p))              # sound speed
-    om  = np.sqrt(G * M_star / r**3)                 # keplerian frequency
-    H   = cs / om                                    # gas scale height
-    n   = sigma_g / (np.sqrt(2 * np.pi) * H * m_p)   # mid-plane number density
+    cs = np.sqrt(k_b * T / (mu * m_p))              # sound speed
+    om = np.sqrt(G * M_star / r**3)                 # keplerian frequency
+    H = cs / om                                    # gas scale height
+    n = sigma_g / (np.sqrt(2 * np.pi) * H * m_p)   # mid-plane number density
     mfp = 0.5 / (sig_h2 * n)                         # mean free path
     Re = alpha * sigma_g * sig_h2 / (2 * mu * m_p)   # particle reynolds number
 
@@ -1586,7 +1587,7 @@ def get_B11S_fit(T, a, r=au, sigma_g=200., d2g=0.01, rho_s=1.6686, M_star=M_sun,
 
     # the factor of 1.25 accounts for the tail of larger (faster) paraticles
     b = 3. * alpha * cs**2 / v_frag**2 * 1.25
-    St_f  = 0.5 * (b - np.sqrt(b**2 - 4.))
+    St_f = 0.5 * (b - np.sqrt(b**2 - 4.))
 
     # calculate the knee at roughly micron sizes, a_BT (Eq. 37 in B11)
 
@@ -1595,8 +1596,8 @@ def get_B11S_fit(T, a, r=au, sigma_g=200., d2g=0.01, rho_s=1.6686, M_star=M_sun,
 
     # calculate transition in turbulent velocities, Eq. 39 in B11
 
-    St_12    = Re**-0.5 * 0.625
-    a_12     = 2. * sigma_g / (np.pi * rho_s) * St_12
+    St_12 = Re**-0.5 * 0.625
+    a_12 = 2. * sigma_g / (np.pi * rho_s) * St_12
     if stokes_regime:
         a_12_St1 = (9. * St_12 * sigma_g * mfp / (2. * np.pi * rho_s))**0.5
         a_12 = np.minimum(a_12, a_12_St1)
@@ -1621,7 +1622,7 @@ def get_B11S_fit(T, a, r=au, sigma_g=200., d2g=0.01, rho_s=1.6686, M_star=M_sun,
 
     # calculate settling size
 
-    a_set     = 2. * sigma_g / (np.pi * rho_s) * alpha
+    a_set = 2. * sigma_g / (np.pi * rho_s) * alpha
     if stokes_regime:
         a_set_St1 = (9. * alpha * sigma_g * mfp / (2. * np.pi * rho_s))**0.5
         a_set = np.minimum(a_set, a_set_St1)
@@ -1905,7 +1906,7 @@ def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function,
         'S1': s_1,
         'S2': s_2,
         'theta': np.linspace(0, 180., 2 * nang - 1)
-        }
+    }
 
     package['info'] = """Created with the disklab package by Kees Dullemond and Til Birnstiel.
     If you make use of this file or package, do cite the according paper
@@ -2014,7 +2015,7 @@ def make_opacity_dict(lam, a, k_abs, k_sca, g_sca, rho_s, zscat=None):
         'rho_s': rho_s,
         'a': a,
         'zscat': zscat
-        }
+    }
 
     return package
 
@@ -2067,16 +2068,30 @@ def write_disklab_opacity(fname, opac_dict, path='.'):
     # build a dict that contains only the data we need
 
     dictionary = {}
-    dictionary['a']     = opac_dict['a']
-    dictionary['lam']   = opac_dict['lam']
+    dictionary['a'] = opac_dict['a']
+    dictionary['lam'] = opac_dict['lam']
     dictionary['k_abs'] = opac_dict['k_abs']
     dictionary['k_sca'] = opac_dict['k_sca']
-    if 'g' in opac_dict:
-        dictionary['g'] = opac_dict['g']
-    if 'rho_s' in opac_dict:
-        dictionary['rho_s'] = opac_dict['rho_s']
-    if 'info' in opac_dict:
-        dictionary['info'] = opac_dict['info']
+
+    for key in [
+            'g',
+            'S1',
+            'S2',
+            'q_abs',
+            'q_sca',
+            'info',
+            'rho_s',
+            'theta',
+            'a_h',
+            'k_abs_h',
+            'k_sca_h',
+            'q_abs_h',
+            'q_sca_h',
+            'g_h',
+            'S1_h',
+            'S2_h']:
+        if key in opac_dict:
+            dictionary[key] = opac_dict[key]
 
     np.savez_compressed(os.path.join(path, fname), **dictionary)
 
@@ -2117,14 +2132,14 @@ def write_radmc3d_dustkappa_from_array(name, lam, k_abs, k_sca, g=None, path='.'
             lam * 1e4,
             k_abs,
             k_sca
-            ]).T
+        ]).T
     else:
         data = np.array([
             lam * 1e4,
             k_abs,
             k_sca,
             g
-            ]).T
+        ]).T
 
     header = '3\n{:d}\n'.format(len(lam))
     np.savetxt(filename, data, header=header, comments='')
@@ -2174,18 +2189,18 @@ def write_radmc3d_dustkappa_from_dict(name, opac_dict, i_grain=None, a_grain=Non
 
         # if i_grain is given, just pick it
 
-        lam   = opac_dict['lam']
+        lam = opac_dict['lam']
         k_abs = opac_dict['k_abs'][i_grain]
         k_sca = opac_dict['k_sca'][i_grain]
-        g     = opac_dict['g'][i_grain]
+        g = opac_dict['g'][i_grain]
     else:
 
         # if a_grain is given: interpolate (log-log in kappa, log-lin in g)
 
-        lam   = opac_dict['lam']
+        lam = opac_dict['lam']
         k_abs = opac_dict['k_abs']
         k_sca = opac_dict['k_sca']
-        g     = opac_dict['g']
+        g = opac_dict['g']
 
         f = interp1d(np.log10(opac_dict['a']), np.array([np.log10(k_abs), np.log10(k_sca), g]), axis=1)
 
@@ -2364,7 +2379,7 @@ def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False, ax=None, twoaxes
     else:
         ax1.set_ylabel('$n, k$')
 
-    ax1.legend(lines, [l.get_label() for l in lines], loc='best', fontsize='xx-small')
+    ax1.legend(lines, [li.get_label() for li in lines], loc='best', fontsize='xx-small')
 
     if twoaxes:
         return ax1, ax2
@@ -2414,7 +2429,7 @@ def get_dsharp_mix(fm_ice=0.2, porosity=0.0, rule='Bruggeman'):
         diel_draine2003('astrosilicates'),
         diel_henning('troilite'),
         diel_henning('organics', refractory=True),
-        ]
+    ]
 
     # material densities
 
@@ -2618,7 +2633,7 @@ def size_average_opacity(lam_avg, a, lam, k_abs, k_sca, q=3.5, plot=False, ax=No
     ---------
 
     q : float
-        power-law index of the size distribution, n(a) \propto a^{-q}
+        power-law index of the size distribution, n(a) propto a^{-q}
 
     plot : bool
         if True, create a plot of the result
@@ -2758,8 +2773,8 @@ def get_smooth_opacities(a, lam, rho_s, diel_const, smoothing='linear', **kwargs
     n_inter = 40
 
     # for gaussian smoothing:
-    eps     = 0.1   # how far around each grid point the averaging-grid extends
-    sigma   = 0.05  # the width of the gaussian weights around a[i] (in terms of a[i])
+    eps = 0.1   # how far around each grid point the averaging-grid extends
+    sigma = 0.05  # the width of the gaussian weights around a[i] (in terms of a[i])
 
     if smoothing == 'linear':
 
@@ -2794,23 +2809,25 @@ def get_smooth_opacities(a, lam, rho_s, diel_const, smoothing='linear', **kwargs
 
     res_h = get_opacities(a_h, lam, rho_s, diel_const, **kwargs)
 
-    k_abs_h  = res_h['k_abs']
-    k_sca_h  = res_h['k_sca']
-    q_abs_h  = res_h['q_abs']
-    q_sca_h  = res_h['q_sca']
-    g_h      = res_h['g']
-    S1_h     = res_h['S1']
-    S2_h     = res_h['S2']
-    theta    = res_h['theta']
-    n_theta  = len(theta)
+    k_abs_h = res_h['k_abs']
+    k_sca_h = res_h['k_sca']
+    q_abs_h = res_h['q_abs']
+    q_sca_h = res_h['q_sca']
+    g_h = res_h['g']
+    S1_h = res_h['S1']
+    S2_h = res_h['S2']
+    theta = res_h['theta']
+    n_theta = len(theta)
 
     # create arrays to store the smoothed values
 
-    k_sca_avg_h = np.zeros((len(a), len(lam)))
-    k_abs_avg_h = np.zeros((len(a), len(lam)))
-    g_avg_h     = np.zeros((len(a), len(lam)))
-    S1_avg_h    = np.zeros((len(a), len(lam), n_theta), dtype=S1_h.dtype)
-    S2_avg_h    = np.zeros((len(a), len(lam), n_theta), dtype=S1_h.dtype)
+    k_sca = np.zeros((len(a), len(lam)))
+    k_abs = np.zeros((len(a), len(lam)))
+    q_sca = np.zeros((len(a), len(lam)))
+    q_abs = np.zeros((len(a), len(lam)))
+    g = np.zeros((len(a), len(lam)))
+    S1 = np.zeros((len(a), len(lam), n_theta), dtype=S1_h.dtype)
+    S2 = np.zeros((len(a), len(lam), n_theta), dtype=S1_h.dtype)
 
     # for each low-res grid point ...
 
@@ -2830,31 +2847,52 @@ def get_smooth_opacities(a, lam, rho_s, diel_const, smoothing='linear', **kwargs
 
         # average over this range
 
-        k_abs_avg_h[i, :] = (w[:, None] * k_abs_h[i0:i1, :]).sum(0)
-        k_sca_avg_h[i, :] = (w[:, None] * k_sca_h[i0:i1, :]).sum(0)
-        g_avg_h[i, :]     = (w[:, None] * g_h[i0:i1, :]).sum(0)
-        S1_avg_h[i, :, :]  = (w[:, None, None] * S1_h[i0:i1, :, :]).sum(0)
-        S2_avg_h[i, :, :]  = (w[:, None, None] * S2_h[i0:i1, :, :]).sum(0)
+        k_abs[i, :] = (w[:, None] * k_abs_h[i0:i1, :]).sum(0)
+        k_sca[i, :] = (w[:, None] * k_sca_h[i0:i1, :]).sum(0)
+        q_abs[i, :] = (w[:, None] * q_abs_h[i0:i1, :]).sum(0)
+        q_sca[i, :] = (w[:, None] * q_sca_h[i0:i1, :]).sum(0)
+        g[i, :] = (w[:, None] * g_h[i0:i1, :]).sum(0)
+        S1[i, :, :] = (w[:, None, None] * S1_h[i0:i1, :, :]).sum(0)
+        S2[i, :, :] = (w[:, None, None] * S2_h[i0:i1, :, :]).sum(0)
 
-    # store the results in the dictionary, but keep the high-res results with new name
+    # store the results in a dictionary, but keep the high-res results with new name
 
-    res_h['a_h']     = a_h
-    res_h['k_abs_h'] = k_abs_h
-    res_h['k_sca_h'] = k_sca_h
-    res_h['q_abs_h'] = q_abs_h
-    res_h['q_sca_h'] = q_sca_h
-    res_h['g_h']     = g_h
-    res_h['S1_h']    = S1_h
-    res_h['S2_h']    = S2_h
+    res = {}
 
-    res_h['k_abs'] = k_abs_avg_h
-    res_h['k_sca'] = k_sca_avg_h
-    res_h['g']     = g_avg_h
-    res_h['a']     = a
-    res_h['S1']    = S1_avg_h
-    res_h['S2']    = S2_avg_h
+    # first the averaged things
 
-    res_h['q_abs']    = k_abs_avg_h * (4 / 3 * rho_s * a)[:, None]
-    res_h['q_sca']    = k_sca_avg_h * (4 / 3 * rho_s * a)[:, None]
+    res['k_abs'] = k_abs
+    res['k_sca'] = k_sca
+    res['g'] = g
+    res['S1'] = S1
+    res['S2'] = S2
 
-    return res_h
+    # we could use the averaged q ...
+    # res['q_abs'] = q_abs
+    # res['q_sca'] = q_sca
+
+    # ... or to be consistent, we calculate it from the opacity
+
+    res['q_abs'] = k_abs * (4 / 3 * rho_s * a)[:, None]
+    res['q_sca'] = k_sca * (4 / 3 * rho_s * a)[:, None]
+
+    # the default things
+
+    res['a'] = a
+    res['lam'] = lam
+    res['info'] = res_h['info']
+    res['rho_s'] = res_h['rho_s']
+    res['theta'] = res_h['theta']
+
+    # finally the high-res (non-averaged) results
+
+    res['a_h'] = a_h
+    res['k_abs_h'] = k_abs_h
+    res['k_sca_h'] = k_sca_h
+    res['q_abs_h'] = q_abs_h
+    res['q_sca_h'] = q_sca_h
+    res['g_h'] = g_h
+    res['S1_h'] = S1_h
+    res['S2_h'] = S2_h
+
+    return res
