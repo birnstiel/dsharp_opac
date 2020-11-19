@@ -2295,7 +2295,7 @@ def write_radmc3d_scatmat_file(index, opacity_dict, name, path='.'):
                         (opacity_dict['zscat'][index, ilam, itheta, 0], opacity_dict['zscat'][index, ilam, itheta, 1],
                          opacity_dict['zscat'][index, ilam, itheta, 2], opacity_dict['zscat'][index, ilam, itheta, 3],
                          opacity_dict['zscat'][index, ilam, itheta, 4], opacity_dict['zscat'][index, ilam, itheta, 5]))
-        f.write('\n')
+            f.write('\n')
 
 
 def read_radmc3d_scatmat_file(name, path='.'):
