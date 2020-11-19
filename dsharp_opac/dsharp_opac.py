@@ -12,6 +12,7 @@ import sys
 import warnings
 import pkg_resources
 import astropy.constants as const
+from pathlib import Path
 
 au = const.au.cgs.value
 M_sun = const.M_sun.cgs.value
@@ -2269,8 +2270,8 @@ def write_radmc3d_scatmat_file(index, opacity_dict, name, path='.'):
 
     with open(filename, 'w') as f:
         f.write('# Opacity and scattering matrix file for ' + name + '\n')
-        f.write('# Please do not forget to cite in your publications theoriginal paper of these optical constant measurements\n')
-        f.write('# Made with the DSHARO_OPAC package by Cornelis Dullemond & Til Birnstiel\n')
+        f.write('# Please do not forget to cite in your publications theo riginal paper of these optical constant measurements\n')
+        f.write('# Made with the DSHARP_OPAC package by Cornelis Dullemond & Til Birnstiel\n')
         f.write('# using either the bhmie.py Mie code of Bohren and Huffman (python version by Cornelis Dullemond,\n')
         f.write('# or a F90 version by Til Birnstiel, both after the original bhmie.f code by Bruce Draine)\n')
         f.write('# Grain size = {0:13.6e} cm\n'.format(opacity_dict["a"][index]))
@@ -2295,6 +2296,65 @@ def write_radmc3d_scatmat_file(index, opacity_dict, name, path='.'):
                          opacity_dict['zscat'][index, ilam, itheta, 2], opacity_dict['zscat'][index, ilam, itheta, 3],
                          opacity_dict['zscat'][index, ilam, itheta, 4], opacity_dict['zscat'][index, ilam, itheta, 5]))
         f.write('\n')
+
+
+def read_radmc3d_scatmat_file(name, path='.'):
+    """
+    Read scattering matrix from species `name` in RADMC3D kapscatmat format
+
+    Arguments:
+    ----------
+
+    name : str
+        name to be used as species name, will be part of the file name
+
+    path : str
+        the directory where the output file will be saved
+
+    Output:
+    dict:
+        Keys: lam, k_abs, k_sca, g, theta, zsca
+    """
+    filename = Path(path) / 'dustkapscatmat_{}.inp'.format(name)
+
+    with filename.open('r') as f:
+        while True:
+            line = f.readline().strip()
+            if line.startswith('#') or (line == ''):
+                continue
+            form = int(line.strip())
+            if form != 1:
+                raise ValueError('format needs to be 1')
+            break
+        n_lam, n_theta = np.fromfile(f, dtype=int, count=2, sep=" ")
+
+        data = np.fromfile(f, dtype=float, count=n_lam * 4, sep=' ')
+        lam, k_abs, k_sca, g = data.reshape(-1, 4).T
+        lam *= 1e-4
+
+        theta = np.fromfile(f, dtype=float, count=n_theta, sep=' ')
+
+        zscat = np.zeros([n_lam, n_theta, 6])
+
+        for ilam in range(n_lam):
+            for itheta in range(n_theta):
+                zscat[ilam, itheta, :] = np.fromfile(f, dtype=float, count=6, sep=' ')
+
+        while True:
+            line = f.readline()
+            if not line:
+                break
+            elif line.strip() != '':
+                raise ValueError('there remain lines in the scatmat file!')
+
+        return {
+            'theta': theta,
+            'lam': lam,
+            'k_abs': k_abs,
+            'k_sca': k_sca,
+            'g': g,
+            'zscat': zscat,
+        }
 
 
 def compare_nk(constants, lmin=1e-5, lmax=1e3, orig_data=False, ax=None, twoaxes=True):

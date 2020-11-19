@@ -33,6 +33,7 @@ from .dsharp_opac import \
     make_opacity_dict, \
     write_disklab_opacity, \
     write_radmc3d_scatmat_file, \
+    read_radmc3d_scatmat_file, \
     compare_nk, \
     get_ricci_mix, \
     get_dsharp_mix, \
@@ -74,6 +75,7 @@ __all__ = [
     'make_opacity_dict',
     'write_disklab_opacity',
     'write_radmc3d_scatmat_file',
+    'read_radmc3d_scatmat_file',
     'compare_nk',
     'get_ricci_mix',
     'get_dsharp_mix',
