@@ -190,12 +190,9 @@ SUBROUTINE BHMIE_FORTRAN(X,REFREL,NANG,S1,S2,QEXT,QABS,QSCA,QBACK,GSCA)
   ! conclusion: we are indeed retaining enough terms in series!
 
   NSTOP=NINT(XSTOP)
-
-  NMXX=NSTOP
-  NMX=NSTOP
-
+  
   ! allocation part
-
+  NMXX=NMX
   allocate(D(NMXX))
 
   !*** Require NANG.GE.1 in order to calculate scattering intensities
