@@ -12,14 +12,14 @@ style = [
         'font.size': 9,  # 12
         'image.cmap': 'inferno',
         'figure.dpi': 200,
-        'font.family': ['Times', 'Times New Roman'],
+        'font.family': 'serif',
+        'font.serif': ['Times', 'Times New Roman'] + plt.rcParams['font.serif'],
         'xtick.top': True,
         'xtick.direction': 'in',
         'ytick.right': True,
         'ytick.direction': 'in',
         'mathtext.fontset': 'cm'
         }]
-
 
 def set_style():
     "Set the style of DSHARP"
