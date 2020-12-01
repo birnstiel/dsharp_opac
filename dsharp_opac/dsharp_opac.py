@@ -2090,6 +2090,7 @@ def write_disklab_opacity(fname, opac_dict, path='.'):
             'q_sca_h',
             'g_h',
             'S1_h',
+            'zscat',
             'S2_h']:
         if key in opac_dict:
             dictionary[key] = opac_dict[key]
