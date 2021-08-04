@@ -6,6 +6,7 @@ This module contains opacity scripts and all the helper and testing routines.
   the functions `diel_*.nk` return the optical properties
 """
 from __future__ import print_function
+from numba.core.errors import reset_terminal
 import numpy as np
 import os
 import sys
@@ -13,6 +14,7 @@ import warnings
 import pkg_resources
 import astropy.constants as const
 from pathlib import Path
+from scipy.interpolate import interp2d, RegularGridInterpolator
 
 au = const.au.cgs.value
 M_sun = const.M_sun.cgs.value
@@ -1697,7 +1699,7 @@ def get_kappa_from_q(a, m, q_abs, q_sca):
 
 
 def get_size_averaged_opacity(a, lam, n, rho_s, diel_const=None, q_abs=None,
-                              q_sca=None, kappa_abs=None, kappa_sca=None):
+                              q_sca=None, kappa_abs=None, kappa_sca=None, S1=None, S2=None, theta=None, g=None):
     """
     Averages the opacity over the given size distribution.
 
@@ -1753,24 +1755,57 @@ def get_size_averaged_opacity(a, lam, n, rho_s, diel_const=None, q_abs=None,
     #
     # calculate the opacities ...
     #
-    if (q_abs is None or q_sca is None) and (kappa_abs is None or kappa_sca is None):
+    if ((q_abs is None or q_sca is None) and (kappa_abs is None or kappa_sca is None)):
         package = get_mie_coefficients(a, lam, diel_const)
         q_abs = package['q_abs']
         q_sca = package['q_sca']
-    elif (kappa_abs is None or kappa_sca is None):
+        g = package['g']
+        S1 = package['S1']
+        S2 = package['S2']
+        theta = package['theta']
+
+    if (kappa_abs is None or kappa_sca is None):
         kappa_abs, kappa_sca = get_kappa_from_q(a, m, q_abs, q_sca)
     #
     # ... average them over the size distribution ...
     #
-    kappa_abs_m = np.zeros(len(lam))
-    kappa_sca_m = np.zeros(len(lam))
-    for i in np.arange(len(lam)):
+    n_lam = len(lam)
+    kappa_abs_m = np.zeros(n_lam)
+    kappa_sca_m = np.zeros(n_lam)
+    # average opacities
+    for i in np.arange(n_lam):
         kappa_abs_m[i] = sum(np.transpose(kappa_abs[:, i]) * sig, 0)
         kappa_sca_m[i] = sum(np.transpose(kappa_sca[:, i]) * sig, 0)
+
+    # average g
+    if g is not None:
+        g_m = np.zeros(n_lam)
+        for i in np.arange(n_lam):
+            g_m[i] = sum(np.transpose(g[:, i]) * sig, 0)
+
+    # average scattering amplitudes
+
+    if theta is not None and S1 is not None and S2 is not None:
+        n_th = len(theta)
+        S1_m = np.zeros([n_lam, n_th])
+        S2_m = np.zeros([n_lam, n_th])
+        for i in np.arange(n_lam):
+            S1_m[i, :] = np.sum(S1[:, i, :].T * sig, -1)
+            S2_m[i, :] = np.sum(S2[:, i, :].T * sig, -1)
+
     #
     # ... and return them
     #
-    return kappa_abs_m, kappa_sca_m
+    res = {
+        'kappa_abs_m': kappa_abs_m,
+        'kappa_sca_m': kappa_sca_m,
+    }
+    if g is not None:
+        res['g'] = g_m
+    if S1 is not None:
+        res['S1'] = S1_m
+        res['S2'] = S2_m
+    return res
 
 
 def get_mie_coefficients(A, LAM, diel_constants, bhmie_function=bhmie_function,
@@ -2670,7 +2705,7 @@ def get_opacities(a, lam, rho_s, diel_const, bhmie_function=bhmie_function,
     return package
 
 
-def size_average_opacity(lam_avg, a, lam, k_abs, k_sca, q=3.5, plot=False, ax=None):
+def size_average_opacity(lam_avg, a, lam, k_abs, k_sca, q=3.5, plot=False, ax=None, g=None, S1=None, S2=None):
     """
     Calculates the opacity as function of maximum particle size for a power-law size distribution
 
@@ -2703,6 +2738,10 @@ def size_average_opacity(lam_avg, a, lam, k_abs, k_sca, q=3.5, plot=False, ax=No
         if None: plot is created in new figure, if axes object: uses this object
         for the plotting.
 
+    g, S1, S2: array
+        other quantities (Henyey Greenstein parameter & scattering amplitudes)
+        that will get averaged if passed
+
     Output:
     -------
     k_abs, k_sca, [ax]
@@ -2715,27 +2754,50 @@ def size_average_opacity(lam_avg, a, lam, k_abs, k_sca, q=3.5, plot=False, ax=No
     """
     import matplotlib.pyplot as plt
 
-    # interpolate at the observed frequencies
     lam_avg = np.array(lam_avg, ndmin=1)
     if len(lam_avg) > 1:
         calc_beta = True
     else:
         calc_beta = False
 
-    k_a = []
-    k_s = []
+    # interpolate at the observed frequencies:
+    # - opacities
 
-    for _lam in lam_avg:
-        k_a += [[np.interp(_lam, lam, k_abs[ia, :]) for ia in range(len(a))]]
-        k_s += [[np.interp(_lam, lam, k_sca[ia, :]) for ia in range(len(a))]]
+    f_a = interp2d(lam, a, k_abs)
+    k_a = f_a(lam_avg, a).T
+    f_s = interp2d(lam, a, k_sca)
+    k_s = f_s(lam_avg, a).T
 
-    k_a = np.array(k_a)
-    k_s = np.array(k_s)
+    # - g-factor
+
+    if g is not None:
+        f_g = interp2d(lam, a, g)
+        g_i = f_g(lam_avg, a).T
+
+    # - scattering amplitudes
+
+    if S1 is not None:
+        n_th = S1.shape[-1]
+        th = np.arange(n_th, dtype=float)
+        new_points = np.reshape(np.meshgrid(a, lam_avg, th, indexing='ij'), (3, -1), order='C').T
+
+        f_S1 = RegularGridInterpolator((a, lam, th), S1)
+        S1_i = f_S1(new_points).reshape([len(a), len(lam_avg), len(th)])
+
+        f_S2 = RegularGridInterpolator((a, lam, th), S2)
+        S2_i = f_S2(new_points).reshape([len(a), len(lam_avg), len(th)])
 
     # average over size distributions
 
     ka = np.zeros([len(lam_avg), len(a)])
     ks = np.zeros([len(lam_avg), len(a)])
+
+    if g is not None:
+        g_m = np.zeros([len(lam_avg), len(a)])
+    if S1 is not None:
+        S1_m = np.zeros([len(lam_avg), len(a), n_th])
+        S2_m = np.zeros([len(lam_avg), len(a), n_th])
+
     for ia in range(len(a)):
 
         # make a size distribution
@@ -2749,7 +2811,18 @@ def size_average_opacity(lam_avg, a, lam, k_abs, k_sca, q=3.5, plot=False, ax=No
             ka[ilam, ia] = np.sum(k_a[ilam, :] * s)
             ks[ilam, ia] = np.sum(k_s[ilam, :] * s)
 
+            if g is not None:
+                g_m[ilam, ia] = np.sum(g_i[ilam, :] * s)
+            if S1 is not None:
+                S1_m[ilam, ia, :] = np.sum(S1_i * s[:, None, None], 1)
+                S2_m[ilam, ia, :] = np.sum(S2_i * s[:, None, None], 1)
+
     ret = {'ka': ka, 'ks': ks}
+    if g is not None:
+        ret['g'] = g_m
+    if S1 is not None:
+        ret['S1'] = S1_m
+        ret['S2'] = S2_m
 
     # calculate beta
 
