@@ -2333,6 +2333,100 @@ def write_radmc3d_scatmat_file(index, opacity_dict, name, path='.'):
             f.write('\n')
 
 
+def interpolate_radmc3d_scatmat_file(a, opacity_dict, name, path='.'):
+    """
+    The RADMC-3D radiative transfer package[1] can perform dust continuum
+    radiative transfer for diagnostic purposes. It is designed for astronomical
+    applications. The code needs the opacities in a particular form. This
+    subroutine writes the opacities out in that form. It will write it to
+    the file dustkapscatmat_<name>.inp.
+
+    Arguments:
+    ----------
+
+    a : float
+        grain size to be written out
+
+    opacity_dict : dict
+        dictionary with the opacity information. the keys are:
+
+        a : array
+            particle size grid in cm
+
+        lam : array
+            wavelength grid in cm
+
+        theta : array
+            angle grid (degree)
+
+        rho_s : float
+            internal density of the particles
+
+        k_abs, k_sca : array
+            absorption and scattering opacities
+            size = len(a), len(lam)
+
+        g_scat : array
+            Henyey-Greenstein coefficient
+            size = len(a), len(lam)
+
+        zscat : array
+            scattering Mueller matrix elements
+            size = len(a), len(lam), len(theta), 6
+
+    name : str
+        name to be used as species name, will be part of the file name
+
+    path : str
+        the directory where the output file will be saved
+
+
+    References:
+    -----------
+
+    - [1] http://www.ita.uni-heidelberg.de/~dullemond/software/radmc-3d/
+
+    """
+    a_grid = opacity_dict['a']
+    zscat = opacity_dict['zscat']
+
+    filename = os.path.join(path, 'dustkapscatmat_{}.inp'.format(name))
+
+    with open(filename, 'w') as f:
+        f.write('# Opacity and scattering matrix file for ' + name + '\n')
+        f.write('# Please do not forget to cite in your publications theo riginal paper of these optical constant measurements\n')
+        f.write('# Made with the DSHARP_OPAC package by Cornelis Dullemond & Til Birnstiel\n')
+        f.write('# using either the bhmie.py Mie code of Bohren and Huffman (python version by Cornelis Dullemond,\n')
+        f.write('# or a F90 version by Til Birnstiel, both after the original bhmie.f code by Bruce Draine)\n')
+        f.write('# Grain size = {0:13.6e} cm\n'.format(a))
+        f.write('# Material density = {0:6.3f} g/cm^3\n'.format(opacity_dict["rho_s"]))
+        f.write('1\n')  # Format number
+        f.write('{0:d}\n'.format(opacity_dict["lam"].size))
+        f.write('{0:d}\n'.format(opacity_dict["theta"].size))
+        f.write('\n')
+        for i in range(opacity_dict['lam'].size):
+            f.write('%13.6e %13.6e %13.6e %13.6e\n' % (opacity_dict['lam'][i] * 1e4,
+                                                       np.interp(a, a_grid, opacity_dict['k_abs'][:, i]),
+                                                       np.interp(a, a_grid, opacity_dict['k_sca'][:, i]),
+                                                       np.interp(a, a_grid, opacity_dict['g'][:, i])))
+        f.write('\n')
+        for j in range(opacity_dict['theta'].size):
+            f.write('%13.6e\n' % (opacity_dict['theta'][j]))
+        f.write('\n')
+        for ilam in range(opacity_dict['lam'].size):
+            for itheta in range(opacity_dict['theta'].size):
+                f.write('%13.6e %13.6e %13.6e %13.6e %13.6e %13.6e\n' %
+                        (
+                            np.interp(a, a_grid, zscat[:, ilam, itheta, 0]),
+                            np.interp(a, a_grid, zscat[:, ilam, itheta, 1]),
+                            np.interp(a, a_grid, zscat[:, ilam, itheta, 2]),
+                            np.interp(a, a_grid, zscat[:, ilam, itheta, 3]),
+                            np.interp(a, a_grid, zscat[:, ilam, itheta, 4]),
+                            np.interp(a, a_grid, zscat[:, ilam, itheta, 5])
+                        ))
+            f.write('\n')
+
+
 def read_radmc3d_scatmat_file(name, path='.'):
     """
     Read scattering matrix from species `name` in RADMC3D kapscatmat format
