@@ -10,4 +10,4 @@ dependencies:
    - ipython
    - mpmath
    - pip:
-     - "--editable=git+https://github.com/birnstiel/dsharp_opac.git#egg=dsharp_opac-master"
+     - git+https://github.com/birnstiel/dsharp_opac.git
