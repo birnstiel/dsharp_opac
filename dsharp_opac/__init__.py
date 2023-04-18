@@ -43,7 +43,8 @@ from .dsharp_opac import \
     distribution, \
     get_B11_fit, \
     get_B11S_fit, \
-    get_datafile
+    get_datafile, \
+    chop_forward_scattering
 
 __all__ = [
     'bhmie_python',
@@ -84,4 +85,5 @@ __all__ = [
     'distribution',
     'get_B11_fit',
     'get_B11S_fit',
-    'get_datafile']
+    'get_datafile',
+    'chop_forward_scattering']
