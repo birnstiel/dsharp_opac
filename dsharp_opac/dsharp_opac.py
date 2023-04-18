@@ -2712,6 +2712,74 @@ def get_ricci_mix(extrapol=False, lmax=None, rule='Bruggeman'):
     return diel_constants, rho_s
 
 
+def chop_forward_scattering(opac_dict, chopforward=5):
+    """Chop the forward scattering.
+
+    This part chops the very-forward scattering part of the phase function.
+    This very-forward scattering part is basically the same as no scattering,
+    but is treated by the code as a scattering event. By cutting this part out
+    of the phase function, we avoid those non-scattering scattering events.
+    This needs to recalculate the scattering opacity kappa_sca and asymmetry
+    factor g.
+
+    Parameters
+    ----------
+    opac_dict : dict
+        opacity dictionary as produced by dsharp_opac
+
+    chopforward : float
+        up to which angle to we truncate the forward scattering
+    """
+
+    k_sca = opac_dict['k_sca']
+    theta = opac_dict['theta']
+    g = opac_dict['g']
+    rho_s = opac_dict['rho_s']
+    lam = opac_dict['lam']
+    a = opac_dict['a']
+    m = 4 * np.pi / 3 * rho_s * a ** 3
+
+    n_a = len(a)
+    n_lam = len(lam)
+
+    if 'zscat' in opac_dict:
+        zscat = opac_dict['zscat']
+    else:
+        S1 = opac_dict['S1']
+        S2 = opac_dict['S2']
+        zscat = calculate_mueller_matrix(lam, m, S1, S2)['zscat']
+
+    zscat_nochop = zscat.copy()
+
+    mu = np.cos(theta * np.pi / 180.)
+    # dmu = np.diff(mu)
+
+    for grain in range(n_a):
+        for i in range(n_lam):
+            if chopforward > 0:
+                iang = np.where(theta < chopforward)
+                if theta[0] == 0.0:
+                    iiang = np.max(iang) + 1
+                else:
+                    iiang = np.min(iang) - 1
+                zscat[grain, i, iang, :] = zscat[grain, i, iiang, :]
+
+                # zav = 0.5 * (zscat[grain, i, 1:, 0] + zscat[grain, i, :-1, 0])
+                # dum = -0.5 * zav * dmu
+                # integral = dum.sum() * 4 * np.pi
+                # k_sca[grain, i] = integral
+
+                # g = <mu> = 2 pi / kappa * int(Z11(mu) mu dmu)
+                # mu_av = 0.5 * (mu[1:] + mu[:-1])
+                # P_mu = 2 * np.pi / k_sca[grain, i] * 0.5 * (zscat[grain, i, 1:, 0] + zscat[grain, i, :-1, 0])
+                # g[grain, i] = np.sum(P_mu * mu_av * dmu)
+
+                k_sca[grain, i] = -2 * np.pi * np.trapz(zscat[grain, i, :, 0], x=mu)
+                g[grain, i] = -2 * np.pi * np.trapz(zscat[grain, i, :, 0] * mu, x=mu) / k_sca[grain, i]
+
+    return zscat, zscat_nochop, k_sca, g
+
+
 def get_opacities(a, lam, rho_s, diel_const, bhmie_function=bhmie_function,
                   extrapol=False, n_angle=3,
                   extrapolate_large_grains=False):
