@@ -4,7 +4,7 @@ try:
 except ImportError:
     print('fortran mie routines unavailable')
 
-__version__ = '1.1.6'
+__version__ = '1.1.7'
 
 from .dsharp_opac import \
     progress_bar, \
