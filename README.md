@@ -1,4 +1,4 @@
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/b04c8f86251749ac92361c6431103a08)](https://app.codacy.com/app/birnstiel/dsharp_opac?utm_source=github.com&utm_medium=referral&utm_content=birnstiel/dsharp_opac&utm_campaign=Badge_Grade_Dashboard)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/b31911d281014b5197cb4ef1acb32cf3)](https://app.codacy.com/gh/birnstiel/dsharp_opac/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 [![DOI](https://zenodo.org/badge/137751482.svg)](https://zenodo.org/badge/latestdoi/137751482)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/birnstiel/dsharp_opac/master?filepath=notebooks%2Findex.ipynb)
 
