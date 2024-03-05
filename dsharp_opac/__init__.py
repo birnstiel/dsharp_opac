@@ -1,10 +1,11 @@
+from importlib import metadata as _md
 from .bhmie_python import bhmie_python
 try:
     from .bhmie_fortran import bhmie_fortran
 except ImportError:
     print('fortran mie routines unavailable')
 
-__version__ = '1.1.7'
+__version__ = _md.version("dsharp_opac")
 
 from .dsharp_opac import \
     progress_bar, \
