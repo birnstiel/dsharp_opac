@@ -11,6 +11,7 @@ import os
 import sys
 import warnings
 import importlib
+import pkg_resources
 import astropy.constants as const
 from pathlib import Path
 from scipy.interpolate import interp2d, RegularGridInterpolator
@@ -160,7 +161,7 @@ def get_datafile(fname, base='data'):
     str : absolute path to data file
 
     """
-    return importlib.resources.files(__name__).joinpath(base).joinpath(fname)
+    return pkg_resources.resource_filename(__name__, os.path.join(base, fname))
 
 
 def download(packagedir):
