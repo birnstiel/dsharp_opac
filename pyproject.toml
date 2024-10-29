@@ -11,7 +11,7 @@ authors = [
     { name = "Til Birnstiel & DSHARP collaboration", email = "til.birnstiel@lmu.de" },
 ]
 license = { file = 'LICENSE' }
-dependencies = ['numpy', 'scipy', 'matplotlib', 'astropy', 'mpmath']
+dependencies = ['numpy', 'scipy', 'matplotlib', 'astropy', 'mpmath', 'setuptools']
 
 [project.urls]
 Repository = "https://github.com/birnstiel/dsharp_opac/"
