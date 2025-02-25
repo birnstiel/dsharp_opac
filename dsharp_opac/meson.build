@@ -22,7 +22,10 @@ fit_module_fortran_sources = [
   ]
 fit_module_source = custom_target('fit_modulemodule.c',
   input: fit_module_fortran_sources,
-  output: ['fit_modulemodule.c'],
+  output: [
+    'fit_modulemodule.c',
+    'fit_module-f2pywrappers2.f90',
+    ],
   command: [py3, '-m', 'numpy.f2py', '--lower', '-m', 'fit_module', '@INPUT@', '--build-dir', 'dsharp_opac']
   )
 py3.extension_module('fit_module',
