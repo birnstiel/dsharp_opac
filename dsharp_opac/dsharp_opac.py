@@ -11,6 +11,8 @@ import os
 import sys
 import warnings
 import importlib
+from contextlib import contextmanager
+import socket
 import pkg_resources
 import astropy.constants as const
 from pathlib import Path
@@ -164,6 +166,27 @@ def get_datafile(fname, base='data'):
     return pkg_resources.resource_filename(__name__, os.path.join(base, fname))
 
 
+@contextmanager
+def temporary_socket_timeout(timeout):
+    """
+    Context manager to temporarily set the socket default timeout.
+
+    Parameters
+    ----------
+    timeout : float
+        The timeout value to set (in seconds).
+    """
+    # Save the current default timeout
+    original_timeout = socket.getdefaulttimeout()
+
+    # Set the new temporary timeout
+    socket.setdefaulttimeout(timeout)
+    try:
+        yield
+    finally:
+        # Restore the original timeout after the block ends
+        socket.setdefaulttimeout(original_timeout)
+
 def download(packagedir):
     """
     Downloads the optical constants files. It works by getting the data from
@@ -187,8 +210,9 @@ def download(packagedir):
             print('material: {}, downloading {}: ... '.format(
                 material, filename), end='')
             try:
-                urlretrieve(link, filename=os.path.join(packagedir, filename))
-                print('Done!')
+                with temporary_socket_timeout(2):
+                    urlretrieve(link, filename=os.path.join(packagedir, filename))
+                    print('Done!')
             except Exception as ex:
                 print('Failed!')
                 raise ex
