@@ -3083,7 +3083,7 @@ def size_average_opacity(lam_avg, a, lam, k_abs, k_sca, q=3.5, plot=False, ax=No
             ks[ilam, ia] = np.sum(k_s[ilam, :] * s)
 
             if g is not None:
-                g_m[ilam, ia] = np.sum(g_i[ilam, :] * s)
+                g_m[ilam, ia] = np.sum(g_i[ilam, :] * k_s[ilam, :] * s ) /ks[ilam, ia]
             if S1 is not None:
                 S1_m[ilam, ia, :] = np.sum(S1_i * s[:, None, None], 1)
                 S2_m[ilam, ia, :] = np.sum(S2_i * s[:, None, None], 1)
