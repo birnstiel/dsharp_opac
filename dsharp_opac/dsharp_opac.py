@@ -13,7 +13,7 @@ import warnings
 import importlib
 from contextlib import contextmanager
 import socket
-import pkg_resources
+from importlib.resources import files
 import astropy.constants as const
 from pathlib import Path
 from scipy.interpolate import interp2d, RegularGridInterpolator
@@ -163,7 +163,7 @@ def get_datafile(fname, base='data'):
     str : absolute path to data file
 
     """
-    return pkg_resources.resource_filename(__name__, os.path.join(base, fname))
+    return files(__package__).joinpath(base, fname)
 
 
 @contextmanager
@@ -186,6 +186,7 @@ def temporary_socket_timeout(timeout):
     finally:
         # Restore the original timeout after the block ends
         socket.setdefaulttimeout(original_timeout)
+
 
 def download(packagedir):
     """
@@ -211,7 +212,8 @@ def download(packagedir):
                 material, filename), end='')
             try:
                 with temporary_socket_timeout(2):
-                    urlretrieve(link, filename=os.path.join(packagedir, filename))
+                    urlretrieve(link, filename=os.path.join(
+                        packagedir, filename))
                     print('Done!')
             except Exception as ex:
                 print('Failed!')
