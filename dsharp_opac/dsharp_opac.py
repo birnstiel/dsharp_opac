@@ -16,7 +16,7 @@ import socket
 from importlib.resources import files
 import astropy.constants as const
 from pathlib import Path
-from scipy.interpolate import interp2d, RegularGridInterpolator, RectBivariateSpline
+from scipy.interpolate import RegularGridInterpolator, RectBivariateSpline
 
 au = const.au.cgs.value
 M_sun = const.M_sun.cgs.value
