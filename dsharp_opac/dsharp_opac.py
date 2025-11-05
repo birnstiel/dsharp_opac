@@ -16,7 +16,7 @@ import socket
 from importlib.resources import files
 import astropy.constants as const
 from pathlib import Path
-from scipy.interpolate import interp2d, RegularGridInterpolator
+from scipy.interpolate import interp2d, RegularGridInterpolator, RectBivariateSpline
 
 au = const.au.cgs.value
 M_sun = const.M_sun.cgs.value
@@ -660,7 +660,7 @@ class diel_jaeger98(diel_const):
             T)
         self.rho = rhos[temps.index(T)]
 
-        fname = 'cel{}.lnk'.format(T)
+        fname = 'cel{}.txt'.format(T)
         self.datafile = get_datafile(os.path.join(
             'jaeger', fname), base='optical_constants')
         if not os.path.isfile(self.datafile):
@@ -1482,7 +1482,7 @@ class diel_mixed():
 
         lmin = np.max([c._lmin for c in const])
         lmax = np.min([c._lmax for c in const])
-        lam = np.logspace(np.log10(lmin), np.log10(lmax), 200)
+        lam = np.geomspace(lmin, lmax, 200)
 
         n = np.zeros_like(lam)
         k = np.zeros_like(lam)
@@ -1494,7 +1494,7 @@ class diel_mixed():
         d.datafile = ''
 
         for c in const:
-            d.datafile += c.datafile + '\n'
+            d.datafile += str(c.datafile) + '\n'
 
         d.material_str = self.material_str
         d.extrapol = self.extrapol
@@ -1530,7 +1530,7 @@ def powerlaw_N_of_a(a, a_max, q, rho_s):
     """
     m = 4. * np.pi / 3. * rho_s * a**3
     dist = a**-q * (a <= a_max)
-    dist = dist / np.trapz(dist * m, x=a)
+    dist = dist / np.trapezoid(dist * m, x=a)
     return dist
 
 
@@ -1563,7 +1563,7 @@ def gaussian_N_of_a(a, a_mean, sigma_a, rho_s):
     """
     m = 4. * np.pi / 3. * rho_s * a**3
     dist = np.exp(-(a - a_mean)**2 / (2 * sigma_a**2))
-    dist = dist / np.trapz(dist * m, x=a)
+    dist = dist / np.trapezoid(dist * m, x=a)
     return dist
 
 
@@ -1744,7 +1744,7 @@ def get_B11S_fit(T, a, r=au, sigma_g=200., d2g=0.01, rho_s=1.6686, M_star=M_sun,
 
     # normalize as *distribution*
 
-    sigma_d = sigma_d / np.trapz(sigma_d, x=a) * sigma_g * d2g
+    sigma_d = sigma_d / np.trapezoid(sigma_d, x=a) * sigma_g * d2g
 
     return sigma_d, a_frag
 
@@ -2883,9 +2883,9 @@ def chop_forward_scattering(opac_dict, chopforward=5):
                 # g[grain, i] = np.sum(P_mu * mu_av * dmu)
 
                 k_sca[grain, i] = -2 * np.pi * \
-                    np.trapz(zscat[grain, i, :, 0], x=mu)
+                    np.trapezoid(zscat[grain, i, :, 0], x=mu)
                 g[grain, i] = -2 * np.pi * \
-                    np.trapz(zscat[grain, i, :, 0] *
+                    np.trapezoid(zscat[grain, i, :, 0] *
                              mu, x=mu) / k_sca[grain, i]
 
     return zscat, zscat_nochop, k_sca, g
@@ -3035,16 +3035,16 @@ def size_average_opacity(lam_avg, a, lam, k_abs, k_sca, q=3.5, plot=False, ax=No
     # interpolate at the observed frequencies:
     # - opacities
 
-    f_a = interp2d(lam, a, k_abs)
-    k_a = f_a(lam_avg, a).T
-    f_s = interp2d(lam, a, k_sca)
-    k_s = f_s(lam_avg, a).T
+    f_a = RectBivariateSpline(lam, a, k_abs.T)
+    k_a = f_a(lam_avg, a)
+    f_s = RectBivariateSpline(lam, a, k_sca.T)
+    k_s = f_s(lam_avg, a)
 
     # - g-factor
 
     if g is not None:
-        f_g = interp2d(lam, a, g)
-        g_i = f_g(lam_avg, a).T
+        f_g = RectBivariateSpline(lam, a, g.T)
+        g_i = f_g(lam_avg, a)
 
     # - scattering amplitudes
 

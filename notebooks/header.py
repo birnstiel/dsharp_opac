@@ -1,7 +1,10 @@
 from IPython import get_ipython
 ipython = get_ipython()
 if ipython is not None:
-    ipython.magic(u'matplotlib inline')
+    try:
+        ipython.magic(u'matplotlib inline')
+    except AttributeError:
+        ipython.run_line_magic('matplotlib', 'inline')
 
 import matplotlib.pyplot as plt
 import numpy as np

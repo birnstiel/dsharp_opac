@@ -75,7 +75,7 @@ par_ini   = [T,    v_frag, alpha, sigma_g]  # noqa - initial parameter value
 n_grid    = [10,   10,     10,    10]       # noqa - number of parameter values
 n_params  = len(par_names)
 par_grid = [
-    np.logspace(np.log10(p_start), np.log10(p_end), _n)
+    np.geomspace(p_start, p_end, _n)
     for p_start, p_end, _n in zip(par_start, par_end, n_grid)
     ]
 
@@ -104,15 +104,15 @@ k_ext_p_d = (k_ext_d.T * power_law[None, :]).sum(1)
 for it, _T in enumerate(par_grid[0]):
     Bnu    = aux.planck_B_nu(nu, _T)
     dBnudT = aux.planck_dBnu_dT(nu, _T)
-    B      = np.trapz(Bnu, x=nu)
-    dBdT   = np.trapz(dBnudT, x=nu)
+    B      = np.trapezoid(Bnu, x=nu)
+    dBdT   = np.trapezoid(dBnudT, x=nu)
 
     if _T < 170:
-        k_P_pf[it]  = np.trapz(Bnu * k_abs_p_w, x=nu) / B
-        k_R_pf[it]  = dBdT / np.trapz(dBnudT / k_ext_p_w, x=nu)
+        k_P_pf[it]  = np.trapezoid(Bnu * k_abs_p_w, x=nu) / B
+        k_R_pf[it]  = dBdT / np.trapezoid(dBnudT / k_ext_p_w, x=nu)
     else:
-        k_P_pf[it]  = np.trapz(Bnu * k_abs_p_d, x=nu) / B
-        k_R_pf[it]  = dBdT / np.trapz(dBnudT / k_ext_p_d, x=nu)
+        k_P_pf[it]  = np.trapezoid(Bnu * k_abs_p_d, x=nu) / B
+        k_R_pf[it]  = dBdT / np.trapezoid(dBnudT / k_ext_p_d, x=nu)
 
 # --------------------
 # DEFINE DATA FUNCTION
@@ -129,7 +129,6 @@ def get_data(values):
         T, a, r=r, sigma_g=sigma_g, d2g=d2g, rho_s=rho_s, M_star=M_star,
         v_frag=v_frag, alpha=alpha)
     f1 = f1 / f1.sum()
-
     # get the size distribution fit number 2
 
     f2, amax = opacity.get_B11S_fit(
@@ -166,18 +165,18 @@ def get_data(values):
 
     Bnu    = aux.planck_B_nu(nu, T)
     dBnudT = aux.planck_dBnu_dT(nu, T)
-    B      = np.trapz(Bnu, x=nu)
+    B      = np.trapezoid(Bnu, x=nu)
 
-    k_P_f1 = np.trapz(Bnu * k_abs_f1, x=nu) / B
-    k_P_f2 = np.trapz(Bnu * k_abs_f2, x=nu) / B
-    k_P_pl = np.trapz(Bnu * k_abs_pl, x=nu) / B
+    k_P_f1 = np.trapezoid(Bnu * k_abs_f1, x=nu) / B
+    k_P_f2 = np.trapezoid(Bnu * k_abs_f2, x=nu) / B
+    k_P_pl = np.trapezoid(Bnu * k_abs_pl, x=nu) / B
 
     # calculate Rosseland opacity for the fit and the power-law
 
-    dBdT   = np.trapz(dBnudT, x=nu)
-    k_R_f1 = dBdT / np.trapz(dBnudT / k_ext_f1, x=nu)
-    k_R_f2 = dBdT / np.trapz(dBnudT / k_ext_f2, x=nu)
-    k_R_pl = dBdT / np.trapz(dBnudT / k_ext_pl, x=nu)
+    dBdT   = np.trapezoid(dBnudT, x=nu)
+    k_R_f1 = dBdT / np.trapezoid(dBnudT / k_ext_f1, x=nu)
+    k_R_f2 = dBdT / np.trapezoid(dBnudT / k_ext_f2, x=nu)
+    k_R_pl = dBdT / np.trapezoid(dBnudT / k_ext_pl, x=nu)
 
     return {
         'f1': f1,
