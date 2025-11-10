@@ -4,7 +4,7 @@ requires = ['meson-python', 'numpy']
 
 [project]
 name = 'dsharp_opac'
-version = '1.1.12'
+version = '1.1.13'
 description = 'python routines to calculate mie opacities'
 readme = { file = 'README.md', content-type = 'text/markdown' }
 authors = [
