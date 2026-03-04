@@ -32,3 +32,10 @@ Repository = "https://github.com/birnstiel/dsharp_opac/"
 jit = [
     "numba>=0.64.0",
 ]
+
+[tool.cibuildwheel]
+skip = ["cp314t-*"]
+build-verbosity = 1
+test-command = [
+    "python -c 'import dsharp_opac'",
+]

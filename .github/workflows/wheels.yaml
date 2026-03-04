@@ -1,0 +1,126 @@
+name: Wheels
+on:
+  push:
+    tags: v*
+  pull_request:
+    paths:
+    - pyproject.toml
+    - meson.*
+    - .github/workflows/wheels.yml
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build_wheels:
+    name: Build ${{matrix.select}}-${{ matrix.archs }} wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - os: ubuntu-latest
+          archs: x86_64
+          select: '*manylinux*'
+          id: manylinux_x86_64
+        - os: ubuntu-latest
+          archs: x86_64
+          select: '*musllinux*'
+          id: musllinux_x86_64
+        - os: ubuntu-24.04-arm
+          archs: aarch64
+          select: '*manylinux*'
+          id: manylinux_aarch64
+        # deselected because astropy is missing a wheel for this target
+        #- os: ubuntu-24.04-arm
+        #  archs: aarch64
+        #  select: '*musllinux*'
+        #  id: musllinux_aarch64
+
+        # temporarily deselected because setting up gfortran is its own challenge
+        # - os: macos-15-intel
+        #   archs: x86_64
+        #   select: '*'
+        #   id: macos_x86_64
+        # - os: macos-latest
+        #   archs: arm64
+        #   select: '*'
+        #   id: macos_arm64
+        # - os: windows-latest
+        #   archs: AMD64
+        #   select: '*'
+        #   id: windows_AMD64
+        # - os: windows-11-arm
+        #   archs: ARM64
+        #   select: '*'
+        #   id: windows_ARM64
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      with:
+        persist-credentials: false
+    - name: Build wheels for CPython
+      uses: pypa/cibuildwheel@63fd63b352a9a8bdcc24791c9dbee952ee9a8abc # v3.3.0
+      env:
+        CIBW_ARCHS: ${{ matrix.archs }}
+        CIBW_BUILD: ${{ matrix.select }}
+      with:
+        extras: uv
+        output-dir: dist
+    - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      with:
+        name: wheels-${{ matrix.os }}-${{ matrix.id }}
+        path: dist/*.whl
+
+  build_sdist:
+    name: Build source distribution
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      with:
+        persist-credentials: false
+    - uses: astral-sh/setup-uv@681c641aba71e4a1c380be3ab5e12ad51f415867 # v7.1.6
+      with:
+        enable-cache: true
+        prune-cache: false
+    - name: Build sdist
+      run: uv build --sdist
+    - name: Upload sdist
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      with:
+        name: sdist
+        path: dist/*.tar.gz
+
+  # publishing/deploying to PyPI
+  deploy:
+    name: Publish to PyPI
+    needs:
+    - build_wheels
+    - build_sdist
+    environment:
+      name: pypi
+      url: https://pypi.org/p/dsharp-opac
+    permissions:
+      id-token: write
+
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/v')
+    steps:
+    - name: Download sdist
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      with:
+        name: sdist
+        path: dist
+
+    - name: Download wheels
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      with:
+        path: dist
+        pattern: wheels-*
+        merge-multiple: true
+
+    - name: Publish package distributions to PyPI
+      uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # v1.13.0
