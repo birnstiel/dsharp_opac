@@ -20,9 +20,6 @@ dependencies = [
     "scipy>=1.13.0",
     "matplotlib>=3.8.0",
     "astropy>=7.0.0",
-
-    # only need mpmath.findroot, which I suspect scipy.optimize.fsolve can replace
-    "mpmath>=1.3.0",
 ]
 
 [project.urls]

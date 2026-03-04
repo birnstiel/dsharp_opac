@@ -1423,7 +1423,8 @@ class diel_mixed():
         k : float
         :    imaginary part of mixed optical property
         """
-        from mpmath import findroot
+        from scipy.optimize import newton
+
         l_arr = np.array(lam, ndmin=1)
         eps_mean = np.empty(np.shape(l_arr)).astype('complex')
 
@@ -1439,7 +1440,7 @@ class diel_mixed():
                 #
                 def fct(x):
                     return sum(self.abundances * ((eps - x) / (eps + 2 * x)))
-                eps_mean[i] = complex(findroot(fct, complex(0.5, 0.5)))
+                eps_mean[i] = newton(fct, x0=(0.5 + 0.5j))
             elif self.rule.lower() == 'maxwell-garnett':
                 #
                 # kataoka et al. 2014, eq. 3
