@@ -488,9 +488,9 @@ class diel_from_lnk_file(diel_const):
         #
         self.datafile = datafile
         self.material_str = 'Optical constants from %s' % datafile
-        f = open(self.datafile)
-        self.headerinfo = [f.readline() for i in range(headerlines)]
-        data = np.loadtxt(f)
+        with open(self.datafile) as f:
+            self.headerinfo = f.readlines(headerlines) if headerlines > 0 else []
+            data = np.loadtxt(f)
         #
         # assign wavelength and optical constants
         #
@@ -992,9 +992,9 @@ class diel_WeingartnerDraine2001_astrosil(diel_const):
             'draine', 'eps_suvSil'), base='optical_constants')
         if not os.path.isfile(self.datafile):
             download(os.path.dirname(self.datafile))
-        f = open(self.datafile)
-        self.headerinfo = [f.readline() for i in range(9)]
-        data = np.loadtxt(f)
+        with open(self.datafile) as f:
+            self.headerinfo = f.readlines(9)
+            data = np.loadtxt(f)
         #
         # assign wavelength and optical constants
         #
@@ -1297,9 +1297,9 @@ class diel_ricci10(diel_const):
         #
         # read data and assign wavelength and optical constants
         #
-        f = open(self.datafile)
-        self.headerinfo = [f.readline() for i in range(2)]
-        data = np.loadtxt(f)
+        with open(self.datafile) as f:
+            self.headerinfo = f.readlines(2)
+            data = np.loadtxt(f)
         l = data[:, 0] * 1e-4  # noqa
         n = data[:, 1] + 1.0
         k = data[:, 2]
