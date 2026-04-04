@@ -5,7 +5,6 @@ This module contains opacity scripts and all the helper and testing routines.
 - dielectric functions are objects, see bhmie.diel_*
   the functions `diel_*.nk` return the optical properties
 """
-from __future__ import print_function
 import numpy as np
 import os
 import sys
@@ -219,7 +218,7 @@ def download(packagedir):
                 raise ex
 
 
-class diel_const(object):
+class diel_const:
     """
     Abstract class for dielectric constants objects
     """
@@ -1355,7 +1354,7 @@ class diel_ricci10(diel_const):
         self.print_reference(', or the specific reference for that species')
 
 
-class diel_mixed():
+class diel_mixed:
     """
     This is a dielectric_constant class that mixes the various
     dielectric constants given their abundances.
