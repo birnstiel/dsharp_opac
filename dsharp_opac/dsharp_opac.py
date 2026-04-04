@@ -11,6 +11,7 @@ import os
 import sys
 import warnings
 from contextlib import contextmanager
+from urllib.parse import urlsplit
 import socket
 from importlib.resources import files
 import astropy.constants as const
@@ -205,7 +206,7 @@ def download(packagedir):
         data = json.load(f)
         for material, link in data.items():
 
-            filename = link.split('/')[-1]
+            filename = urlsplit(link).path
 
             print('material: {}, downloading {}: ... '.format(
                 material, filename), end='')
